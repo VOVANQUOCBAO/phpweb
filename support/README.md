@@ -1,30 +1,38 @@
-# Chạy và ghép View cho bài MVC PHP
+# Hướng dẫn phát triển
 
-Mã nguồn dự án nằm trong thư mục `phpweb-main` bên trong. Dự án dùng PHP thuần, PDO và MySQL đi kèm XAMPP ở `D:\data`. Hai Controller Admin và toàn bộ View được giữ nguyên.
+## Chạy dự án
 
-## Chạy trên máy hiện tại
+Từ thư mục gốc, nhấp đúp `setup.bat` rồi mở **http://localhost:8000/**. Script tự tìm XAMPP tại `C:\xampp`, `D:\xampp`, `D:\data` hoặc biến `XAMPP_PATH`, khởi tạo CSDL còn thiếu và chạy server PHP. Các tiến trình chạy nền; script in PID để có thể dừng bằng `Stop-Process -Id <PID>` khi xong.
 
-Mở PowerShell tại thư mục mã nguồn và chạy:
-
-```powershell
-.\tools\chay_local.ps1
-```
-
-Mở `http://localhost:8000/controller/index.php`. Script chạy PHP của XAMPP bằng server phát triển tích hợp và MySQL của XAMPP ở cổng **3307**. Dịch vụ MariaDB cài riêng đang chiếm cổng 3306. Script không cài dịch vụ Windows hay đổi cấu hình Apache/XAMPP toàn cục. Các tiến trình chạy nền; script in PID để có thể dừng bằng `Stop-Process -Id <PID>` khi xong.
-
-Cấu hình hiện tại: host `127.0.0.1`, port `3307`, CSDL `webbanhang_mvc`, user `root`, mật khẩu rỗng. Thay đổi trong `config/database.local.php` khi đổi máy; lấy mẫu từ `database.example.php`. File local không đưa vào Git. Các biến môi trường `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS` được ưu tiên hơn file local.
-
-Khởi tạo bảng bằng `D:\data\php\php.exe tools/khoitao_csdl.php`. SQL chỉ tạo bảng còn thiếu và tài khoản mẫu còn thiếu, giữ nguyên dữ liệu cũ. Có thể tạo CSDL utf8mb4 trong phpMyAdmin, chọn CSDL rồi import `sql/schema.sql`; kết nối phải trỏ đúng MySQL XAMPP ở cổng 3307.
-
-## Kiểm tra luồng dữ liệu
+Nếu cần chỉ định thư mục hoặc cổng:
 
 ```powershell
-& 'D:\data\php\php.exe' tools/test_luong.php
+.\setup.bat -XamppPath 'E:\xampp' -MySqlPort 3307 -WebPort 8000
 ```
 
-Test tự tạo CSDL tên `webbanhang_mvc_test_<chuỗi ngẫu nhiên>`, tạo dữ liệu thử, chạy HTTP với các cookie Session riêng và chạy các tiến trình đồng thời. Cuối lượt test sẽ xóa riêng CSDL vừa tạo và kiểm tra số bản ghi CSDL ứng dụng vẫn giữ nguyên. Script chỉ chạy bằng CLI. Báo cáo nằm ở `tools/ketqua_test.json`; mã thoát 0 nghĩa là mọi kiểm tra đều đạt.
+Cấu hình mặc định là host `127.0.0.1`, port `3306`, CSDL `webbanhang_mvc`, user `root`, mật khẩu rỗng. Cấu hình riêng đặt tại `support/config/database.local.php`; lấy mẫu từ `database.example.php` trong cùng thư mục. Script giữ nguyên cấu hình đã có và tự nhận cổng MySQL XAMPP đang chạy. Các biến `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS` được ưu tiên hơn file local.
 
-Các nhóm kiểm tra: CRUD, đăng ký/đăng nhập/khóa tài khoản, giỏ hàng, giá khuyến mãi/voucher/phí ship, thanh toán, rollback, hủy đơn/hoàn kho, bom/trả hàng, một chiều trạng thái, điểm/hạng, doanh thu, đánh giá, hộp thư, quyền sở hữu đơn, đăng xuất và cạnh tranh tồn kho/voucher/hoàn kho/điểm. Có một ca cố ý làm INSERT chi tiết lỗi để chứng minh rollback; thông báo `Test rollback` trong log là dự kiến.
+Khi cập nhật từ cấu trúc cũ, `setup.bat` tự sao chép cấu hình cũ ở `config/database.local.php` sang vị trí mới nếu cần. File chứa thông tin riêng không được đưa lên GitHub.
+
+### Dùng Apache / phpMyAdmin
+
+Đặt dự án trong `htdocs/phpweb`, bật Apache và MySQL, import [database/webbanhang_mvc.sql](../database/webbanhang_mvc.sql) rồi mở `http://localhost/phpweb/`. MySQL phải trùng host/port trong cấu hình. File SQL tạo 10 bảng, không xóa dữ liệu cũ.
+
+Có thể khởi tạo bằng CLI:
+
+```powershell
+& 'C:\xampp\php\php.exe' support/scripts/khoitao_csdl.php
+```
+
+## Kiểm thử
+
+```powershell
+& 'C:\xampp\php\php.exe' support/tests/test_luong.php
+```
+
+Thay đường dẫn PHP theo máy. Test tự tạo CSDL `webbanhang_mvc_test_<chuỗi ngẫu nhiên>`, chạy Model và HTTP với các cookie Session riêng, kiểm tra cạnh tranh bằng các tiến trình đồng thời, rồi xóa riêng CSDL vừa tạo. Báo cáo nằm ở `support/tests/ketqua_test.json`; mã thoát 0 nghĩa là mọi kiểm tra đều đạt.
+
+Các ca kiểm tra gồm đăng nhập, giỏ hàng, giá khuyến mãi, voucher, thanh toán, hủy/hoàn kho, bom/trả hàng, điểm/hạng, doanh thu, đánh giá và quyền sở hữu đơn. Một số ca chủ động gây lỗi INSERT/UPDATE để chứng minh rollback; thông báo `Test rollback` trong log là dự kiến. Test không gửi email thật.
 
 ## Hợp đồng Controller User với View
 
@@ -57,7 +65,7 @@ Quy ước có thể chỉnh trong Model: phí ship 30.000đ; mỗi 1.000đ tổ
 
 ## Email Gmail SMTP
 
-Đã cài PHPMailer bằng Composer, khóa phiên bản trong `composer.lock`. Khi chuyển máy dùng `composer install`. Thư viện gửi mail này không phải framework MVC. Tài liệu: [PHPMailer chính thức](https://github.com/PHPMailer/PHPMailer).
+Đã cài PHPMailer bằng Composer, khóa phiên bản trong `support/composer.lock`. Khi chuyển máy dùng `composer --working-dir=support install`. Thư viện gửi mail này không phải framework MVC. Tài liệu: [PHPMailer chính thức](https://github.com/PHPMailer/PHPMailer).
 
 Đặt biến môi trường `SMTP_USER` (Gmail), `SMTP_PASS` (mật khẩu ứng dụng), tùy chọn `SMTP_FROM`, rồi khởi động lại server PHP. Không ghi mật khẩu vào mã nguồn. SMTP dùng `smtp.gmail.com`, port 587, STARTTLS, timeout 10 giây.
 

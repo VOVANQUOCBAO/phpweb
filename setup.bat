@@ -1,7 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\chay_local.ps1" %*
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0support\scripts\chay_local.ps1" %*
 set "taskExit=%errorlevel%"
 if not "%taskExit%"=="0" (
     echo.

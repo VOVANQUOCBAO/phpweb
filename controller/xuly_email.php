@@ -4,13 +4,13 @@ require_once dirname(__DIR__) . '/model/email.php';
 require_once dirname(__DIR__) . '/model/khachhang.php';
 require_once dirname(__DIR__) . '/model/chitietdonhang.php';
 
-// Ban tai tu GitHub co san thu vien nho trong lib/; Composer van duoc ho tro.
-$mailAutoload = dirname(__DIR__) . '/vendor/autoload.php';
+// Ban tai tu GitHub co san PHPMailer; Composer van duoc ho tro trong support/.
+$mailAutoload = dirname(__DIR__) . '/support/vendor/autoload.php';
 if (is_file($mailAutoload)) {
     require_once $mailAutoload;
 } else {
     foreach (['Exception', 'PHPMailer', 'SMTP'] as $mailClass) {
-        $mailFile = dirname(__DIR__) . '/lib/PHPMailer/' . $mailClass . '.php';
+        $mailFile = dirname(__DIR__) . '/support/lib/PHPMailer/' . $mailClass . '.php';
         if (is_file($mailFile)) {
             require_once $mailFile;
         }

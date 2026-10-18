@@ -6,7 +6,7 @@ if (PHP_SAPI !== 'cli' || !preg_match('/^webbanhang_mvc_test_[a-f0-9]+$/', geten
     exit(1);
 }
 date_default_timezone_set('Asia/Ho_Chi_Minh');
-require_once dirname(__DIR__) . '/model/donhang.php';
+require_once dirname(__DIR__, 2) . '/model/donhang.php';
 $start = (float) ($argv[2] ?? 0);
 while (microtime(true) < $start) {
     usleep(1000);

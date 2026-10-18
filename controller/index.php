@@ -6,7 +6,7 @@ if (!defined('BASE_PATH')) {
 
 date_default_timezone_set('Asia/Ho_Chi_Minh');
 
-/* Hop dong View: tools/HUONG_DAN.md. Chua co View thi tra JSON de test. */
+/* Hop dong View: support/README.md. Chua co View thi tra JSON de test. */
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }

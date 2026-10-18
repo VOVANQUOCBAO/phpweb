@@ -1,3 +1,6 @@
+/support/config/database.local.php
+/support/vendor/
+/support/tests/ketqua_*.json
 /config/database.local.php
 /vendor/
 /tools/ketqua_*.json

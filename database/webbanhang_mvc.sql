@@ -2,7 +2,7 @@
 -- Cau truc va tai khoan mau; khong co du lieu khach hang/don hang that.
 CREATE DATABASE IF NOT EXISTS webbanhang_mvc CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE webbanhang_mvc;
--- Chon CSDL trong phpMyAdmin truoc khi import, hoac chay tools/khoitao_csdl.php.
+-- Chon CSDL trong phpMyAdmin truoc khi import, hoac chay support/scripts/khoitao_csdl.php.
 -- Script chi tao bang con thieu, khong xoa bang hay du lieu dang co.
 
 CREATE TABLE IF NOT EXISTS danhmuc (

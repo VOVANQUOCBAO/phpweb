@@ -2,7 +2,7 @@
 
 /**
  * Test tich hop Model + HTTP Controller User tren CSDL moi, tach biet.
- * Chay bang PHP XAMPP: D:\data\php\php.exe tools/test_luong.php
+ * Chay bang PHP XAMPP: D:\data\php\php.exe support/tests/test_luong.php
  * Khong import lai hay xoa bang cua CSDL ung dung.
  */
 if (PHP_SAPI !== 'cli') {
@@ -10,7 +10,7 @@ if (PHP_SAPI !== 'cli') {
     exit('Chi chay test bang PHP CLI');
 }
 date_default_timezone_set('Asia/Ho_Chi_Minh');
-define('BASE_PATH', dirname(__DIR__));
+define('BASE_PATH', dirname(__DIR__, 2));
 require_once BASE_PATH . '/model/donhang.php';
 require_once BASE_PATH . '/model/danhmuc.php';
 require_once BASE_PATH . '/model/nhanvien.php';
@@ -94,7 +94,7 @@ function race(string $action, array $args): array
     $children = [];
     $start = microtime(true) + 0.6;
     foreach ($args as $arg) {
-        $cmd = [PHP_BINARY, '-c', php_ini_loaded_file(), BASE_PATH . '/tools/test_worker.php',
+        $cmd = [PHP_BINARY, '-c', php_ini_loaded_file(), BASE_PATH . '/support/tests/test_worker.php',
             $action, (string) $start, json_encode($arg, JSON_UNESCAPED_UNICODE)];
         $proc = proc_open($cmd, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, BASE_PATH);
         if (!is_resource($proc)) {
@@ -171,9 +171,9 @@ try {
     putenv('SMTP_PASS=');
     csdl::resetKetNoi();
     $pdo = csdl::shared();
-    $pdo->exec(file_get_contents(BASE_PATH . '/sql/schema.sql'));
+    $pdo->exec(file_get_contents(BASE_PATH . '/database/schema.sql'));
     // Import lan hai phai giu nguyen du lieu va khong trung tai khoan seed.
-    $pdo->exec(file_get_contents(BASE_PATH . '/sql/schema.sql'));
+    $pdo->exec(file_get_contents(BASE_PATH . '/database/schema.sql'));
     check('CSDL rieng + import SQL lap lai khong xoa du lieu', counts($pdo, $testDb)['nhanvien'] === 1);
 
     $dm = new danhmuc();

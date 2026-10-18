@@ -14,7 +14,10 @@ class csdl
     {
         $cfg = ['host' => '127.0.0.1', 'port' => 3306, 'dbname' => 'webbanhang_mvc',
             'user' => 'root', 'pass' => '', 'charset' => 'utf8mb4'];
-        $file = dirname(__DIR__) . '/config/database.local.php';
+        $file = dirname(__DIR__) . '/support/config/database.local.php';
+        if (!is_file($file)) {
+            $file = dirname(__DIR__) . '/config/database.local.php'; // Tuong thich cau hinh cu khi git pull.
+        }
         if (is_file($file)) {
             $local = require $file;
             if (!is_array($local)) {

@@ -1,4 +1,4 @@
--- Chon CSDL trong phpMyAdmin truoc khi import, hoac chay tools/khoitao_csdl.php.
+-- Chon CSDL trong phpMyAdmin truoc khi import, hoac chay support/scripts/khoitao_csdl.php.
 -- Script chi tao bang con thieu, khong xoa bang hay du lieu dang co.
 
 CREATE TABLE IF NOT EXISTS danhmuc (

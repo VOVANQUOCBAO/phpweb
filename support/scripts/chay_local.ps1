@@ -5,7 +5,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$taskProject = Split-Path -Parent $PSScriptRoot
+$taskProject = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 if ($WebPort -lt 1 -or $WebPort -gt 65535 -or $MySqlPort -lt 0 -or $MySqlPort -gt 65535) {
     throw 'Cong ket noi phai nam trong 1..65535.'
 }
@@ -20,7 +20,7 @@ if ([string]::IsNullOrWhiteSpace($XamppPath)) {
     }
 }
 if ([string]::IsNullOrWhiteSpace($XamppPath)) {
-    throw "Khong tim thay XAMPP. Chay lai: .\tools\chay_local.ps1 -XamppPath 'E:\xampp'"
+    throw "Khong tim thay XAMPP. Chay lai: .\setup.bat -XamppPath 'E:\xampp'"
 }
 $taskPhp = Join-Path $XamppPath 'php\php.exe'
 if (-not (Test-Path -LiteralPath $taskPhp)) {
@@ -43,8 +43,12 @@ function Test-LocalPort([int]$Port) {
     }
 }
 
-$taskConfigFile = Join-Path $taskProject 'config\database.local.php'
-$taskConfigExample = Join-Path $taskProject 'config\database.example.php'
+$taskConfigFile = Join-Path $taskProject 'support\config\database.local.php'
+$taskConfigExample = Join-Path $taskProject 'support\config\database.example.php'
+$taskLegacyConfig = Join-Path $taskProject 'config\database.local.php'
+if (-not (Test-Path -LiteralPath $taskConfigFile) -and (Test-Path -LiteralPath $taskLegacyConfig)) {
+    Copy-Item -LiteralPath $taskLegacyConfig -Destination $taskConfigFile
+}
 $taskMysqlIni = Join-Path $XamppPath 'mysql\bin\my.ini'
 if (-not (Test-Path -LiteralPath $taskConfigFile) -or $MySqlPort -gt 0) {
     $taskInitialPort = $MySqlPort
@@ -100,7 +104,7 @@ if ($taskDbConfig.host -in @('localhost', '127.0.0.1') -and -not (Test-LocalPort
     Write-Output "MySQL XAMPP PID: $($taskMysqlProcess.Id)"
 }
 
-& $taskPhp (Join-Path $taskProject 'tools\khoitao_csdl.php')
+& $taskPhp (Join-Path $taskProject 'support\scripts\khoitao_csdl.php')
 if ($LASTEXITCODE -ne 0) {
     throw 'Ket noi/khoi tao CSDL that bai. Kiem tra database.local.php; neu cong 3306 thuoc dich vu khac, thu -MySqlPort 3307.'
 }
