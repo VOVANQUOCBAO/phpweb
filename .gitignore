@@ -1,0 +1,5 @@
+/config/database.local.php
+/vendor/
+/tools/ketqua_*.json
+/.env
+/.env.*
