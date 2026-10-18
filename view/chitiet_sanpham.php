@@ -133,6 +133,17 @@ $products_mock = [
 ];
 
 $sp = $products_mock[$id_sp] ?? $products_mock[2];
+if (!empty($chitiet) && is_array($chitiet)) {
+    $sp['id'] = (int)$chitiet['id'];
+    $sp['name'] = $chitiet['ten_sp'];
+    $sp['price_old'] = number_format((float)($chitiet['gia_goc'] ?? $chitiet['gia']), 0, ',', '.');
+    $sp['price_new'] = number_format((float)($chitiet['gia_km'] ?? $chitiet['gia']), 0, ',', '.');
+    $sp['price_num'] = (float)($chitiet['gia_km'] ?? $chitiet['gia']);
+    $sp['stock'] = (int)$chitiet['so_luong_ton'];
+    if (!empty($chitiet['hinh'])) {
+        $sp['image'] = $chitiet['hinh'];
+    }
+}
 ?>
 
 <div class="container mb-5 mt-4">

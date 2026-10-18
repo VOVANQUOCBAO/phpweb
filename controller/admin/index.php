@@ -1,175 +1,219 @@
 <?php
-// Bắt đầu phiên làm việc Session cho Khu vực Admin
-if (session_status() === PHP_SESSION_NONE) {
+
+if (!defined('BASE_PATH')) {
+    define('BASE_PATH', dirname(__DIR__, 2));
+}
+
+if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 
-$act = $_REQUEST['act'] ?? $_REQUEST['case'] ?? 'sanpham';
+require_once BASE_PATH . '/controller/controller.php';
+require_once BASE_PATH . '/controller/admin/admin_controller.php';
 
-// Xử lý Đăng nhập Admin [A0]
-if ($act === 'dangnhap') {
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $user = $_POST['admin_user'] ?? '';
-        $pass = $_POST['admin_pass'] ?? '';
-
-        // Kiểm tra tài khoản nhân viên bị khóa [12/5]
-        if (strtolower($user) === 'khoa' || strtolower($user) === 'nv003') {
-            header("Location: ../../view/admin/dangnhap_admin.php?error=locked");
-            exit();
-        }
-
-        // Đăng nhập thành công
-        $_SESSION['admin'] = [
-            'id' => 1,
-            'hoten' => 'Trần Quản Trị (Admin)',
-            'user' => $user,
-            'role' => 'Super Admin'
-        ];
-        header("Location: index.php?act=sanpham");
-        exit();
-    } else {
-        include __DIR__ . "/../../view/admin/dangnhap_admin.php";
-        exit();
-    }
+$ctrl = new controller();
+$admin = new admin_controller();
+$act = $ctrl->act();
+if ($act === 'trangchu') {
+    $act = empty($_SESSION['admin']) ? 'dangnhap' : 'sanpham';
 }
 
-// Xử lý Đăng xuất Admin
+$thongBao = null;
+$loi = null;
+
+if ($act === 'dangnhap') {
+    if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+        $email = $_POST['email'] ?? $_POST['admin_user'] ?? '';
+        $pass = $_POST['mat_khau'] ?? $_POST['admin_pass'] ?? '';
+        if ($email === 'admin') {
+            $email = 'admin@local.test';
+        }
+        $kq = $admin->dangNhap($email, $pass);
+        if ($kq['ok']) {
+            $nv = $kq['nhanvien'];
+            $nv['hoten'] = $nv['ho_ten'] ?? 'Quản Trị Viên';
+            $_SESSION['admin'] = $nv;
+            $ctrl->redirect('sanpham', [], 'admin');
+        }
+        $loi = $kq['loi'];
+    }
+    $ctrl->render('admin/dangnhap_admin.php', compact('thongBao', 'loi') + ['act' => $act]);
+    return;
+}
+
 if ($act === 'dangxuat') {
     unset($_SESSION['admin']);
-    header("Location: ../../view/admin/dangnhap_admin.php");
-    exit();
+    $ctrl->redirect('dangnhap', [], 'admin');
 }
 
-// Kiểm tra quyền Admin (Nếu chưa đăng nhập thì tự động cấp phiên demo để kiểm tra ngay lập tức các trang Admin)
-if (!isset($_SESSION['admin'])) {
-    $_SESSION['admin'] = [
-        'id' => 1,
-        'hoten' => 'Trần Quản Trị (Admin)',
-        'user' => 'admin',
-        'role' => 'Super Admin'
-    ];
+if ($ctrl->requireAdmin() === null) {
+    $ctrl->redirect('dangnhap', [], 'admin');
 }
 
-// Router điều hướng các nghiệp vụ quản trị A1 -> A8
 switch ($act) {
-    // ========================================================
-    // [A1] QUẢN LÝ SẢN PHẨM & DANH MỤC
-    // ========================================================
-    case "sanpham":
-        include __DIR__ . "/../../view/admin/sanpham.php";
+    case 'sanpham':
+        $data = $admin->trangSanPham();
+        $ctrl->render('admin/sanpham.php', $data + compact('thongBao', 'loi') + ['act' => $act]);
         break;
 
-    case "themsanpham":
-        header("Location: index.php?act=sanpham&success=1");
-        exit();
+    case 'themsanpham':
+        $kq = $admin->themSanPham($_POST);
+        $loi = $kq['ok'] ? null : $kq['loi'];
+        $thongBao = $kq['ok'] ? 'Da them san pham' : null;
+        $data = $admin->trangSanPham();
+        $ctrl->render('admin/sanpham.php', $data + compact('thongBao', 'loi') + ['act' => 'sanpham']);
+        break;
 
-    case "themdanhmuc":
-        header("Location: index.php?act=sanpham&success=1");
-        exit();
+    case 'suasanpham':
+        $kq = $admin->suaSanPham((int) ($_POST['id'] ?? 0), $_POST);
+        $loi = $kq['ok'] ? null : $kq['loi'];
+        $thongBao = $kq['ok'] ? 'Da sua san pham' : null;
+        $data = $admin->trangSanPham();
+        $ctrl->render('admin/sanpham.php', $data + compact('thongBao', 'loi') + ['act' => 'sanpham']);
+        break;
 
-    case "xoasanpham":
-        $daban = isset($_GET['daban']) ? (int)$_GET['daban'] : 0;
-        // Chặn xóa nếu sản phẩm đã từng bán [12/5] [9/6]
-        if ($daban > 0) {
-            header("Location: index.php?act=sanpham&msg=block_delete");
-            exit();
+    case 'xoasanpham':
+        $kq = $admin->xoaSanPham((int) ($_GET['id'] ?? $_POST['id'] ?? 0));
+        $loi = $kq['ok'] ? null : $kq['loi'];
+        $thongBao = $kq['ok'] ? 'Da xoa san pham' : null;
+        $data = $admin->trangSanPham();
+        $ctrl->render('admin/sanpham.php', $data + compact('thongBao', 'loi') + ['act' => 'sanpham']);
+        break;
+
+    case 'danhmuc':
+    case 'themdanhmuc':
+        $hanhDong = $_POST['hanh_dong'] ?? $_GET['hanh_dong'] ?? 'them';
+        $kq = $admin->xuLyDanhMuc($hanhDong, $_POST + $_GET);
+        $loi = $kq['ok'] ? null : ($kq['loi'] ?? null);
+        $thongBao = $kq['ok'] ? 'Da cap nhat danh muc' : null;
+        $data = $admin->trangSanPham();
+        $ctrl->render('admin/sanpham.php', $data + compact('thongBao', 'loi') + ['act' => 'sanpham']);
+        break;
+
+    case 'nhanvien':
+        $data = $admin->trangNhanVien();
+        $ctrl->render('admin/nhanvien.php', $data + compact('thongBao', 'loi') + ['act' => $act]);
+        break;
+
+    case 'themnhanvien':
+        $kq = $admin->themNhanVien($_POST);
+        $loi = $kq['ok'] ? null : $kq['loi'];
+        $thongBao = $kq['ok'] ? 'Da them nhan vien' : null;
+        $data = $admin->trangNhanVien();
+        $ctrl->render('admin/nhanvien.php', $data + compact('thongBao', 'loi') + ['act' => 'nhanvien']);
+        break;
+
+    case 'khoanhanvien':
+        $id = (int) ($_GET['id'] ?? $_POST['id'] ?? 0);
+        $tt = (int) ($_GET['trang_thai'] ?? $_POST['trang_thai'] ?? 0);
+        $admin->khoaNhanVien($id, $tt);
+        $data = $admin->trangNhanVien();
+        $ctrl->render('admin/nhanvien.php', $data + ['thongBao' => 'Da cap nhat trang thai nhan vien', 'loi' => null, 'act' => 'nhanvien']);
+        break;
+
+    case 'danhgia':
+        $data = $admin->trangDanhGia();
+        $ctrl->render('admin/danhgia.php', $data + compact('thongBao', 'loi') + ['act' => $act]);
+        break;
+
+    case 'khoadanhgia':
+        $admin->khoaDanhGia((int) ($_GET['id'] ?? $_POST['id'] ?? 0));
+        if (!empty($_POST['khoa_khach'])) {
+            $admin->khoaKhachHang((int) $_POST['khoa_khach'], 0);
         }
-        header("Location: index.php?act=sanpham&success=1");
-        exit();
-
-    // ========================================================
-    // [A2] QUẢN LÝ NHÂN VIÊN
-    // ========================================================
-    case "nhanvien":
-        include __DIR__ . "/../../view/admin/nhanvien.php";
+        $data = $admin->trangDanhGia();
+        $ctrl->render('admin/danhgia.php', $data + ['thongBao' => 'Da khoa danh gia', 'loi' => null, 'act' => 'danhgia']);
         break;
 
-    case "themnhanvien":
-    case "khoanhanvien":
-        header("Location: index.php?act=nhanvien&msg=lock_success");
-        exit();
-
-    // ========================================================
-    // [A3] QUẢN LÝ ĐÁNH GIÁ (Khóa bình luận xấu [24/6])
-    // ========================================================
-    case "danhgia":
-        include __DIR__ . "/../../view/admin/danhgia.php";
+    case 'khachhang':
+        $data = $admin->trangKhachHang();
+        $ctrl->render('admin/khachhang.php', $data + compact('thongBao', 'loi') + ['act' => $act]);
         break;
 
-    case "khoadanhgia":
-        $type = $_GET['type'] ?? 'hide';
-        if ($type === 'lock_user') {
-            header("Location: index.php?act=danhgia&msg=lock_user");
-        } else {
-            header("Location: index.php?act=danhgia&msg=lock_comment");
-        }
-        exit();
-
-    // ========================================================
-    // [A4] QUẢN LÝ KHÁCH HÀNG & KHÁCH BOM HÀNG [24/6]
-    // ========================================================
-    case "khachhang":
-        include __DIR__ . "/../../view/admin/khachhang.php";
+    case 'khoakhachhang':
+        $id = (int) ($_GET['id'] ?? $_POST['id'] ?? 0);
+        $tt = (int) ($_GET['trang_thai'] ?? $_POST['trang_thai'] ?? 0);
+        $admin->khoaKhachHang($id, $tt);
+        $data = $admin->trangKhachHang();
+        $ctrl->render('admin/khachhang.php', $data + ['thongBao' => 'Da cap nhat trang thai khach', 'loi' => null, 'act' => 'khachhang']);
         break;
 
-    case "khoakhachhang":
-        header("Location: index.php?act=khachhang&msg=lock_success");
-        exit();
-
-    case "guiquatang":
-        header("Location: index.php?act=khachhang&msg=gift_success");
-        exit();
-
-    // ========================================================
-    // [A5] QUẢN LÝ VOUCHER MÃ GIẢM GIÁ
-    // ========================================================
-    case "voucher":
-        include __DIR__ . "/../../view/admin/voucher.php";
+    case 'guiquatang':
+        $kq = $admin->guiQuaTang($_POST);
+        $data = $admin->trangKhachHang();
+        $ctrl->render('admin/khachhang.php', $data + [
+            'thongBao' => 'Da gui qua cho ' . ($kq['so_khach'] ?? 0) . ' khach',
+            'loi' => null,
+            'act' => 'khachhang',
+        ]);
         break;
 
-    case "themvoucher":
-    case "xoavoucher":
-        header("Location: index.php?act=voucher&msg=add_success");
-        exit();
-
-    // ========================================================
-    // [A6] QUẢN LÝ KHUYẾN MÃI & HÀNG CẬN HẠN, BÁN Ế [12/5] [17/6]
-    // ========================================================
-    case "khuyenmai":
-        include __DIR__ . "/../../view/admin/khuyenmai.php";
+    case 'voucher':
+        $data = $admin->trangVoucher();
+        $ctrl->render('admin/voucher.php', $data + compact('thongBao', 'loi') + ['act' => $act]);
         break;
 
-    case "themkhuyenmai":
-        header("Location: index.php?act=khuyenmai&msg=promo_applied");
-        exit();
-
-    // ========================================================
-    // [A7] QUẢN LÝ ĐƠN HÀNG (QUY TRÌNH 1 CHIỀU & BOM HÀNG [24/6])
-    // ========================================================
-    case "donhang":
-        include __DIR__ . "/../../view/admin/donhang.php";
+    case 'themvoucher':
+        $kq = $admin->themVoucher($_POST);
+        $loi = $kq['ok'] ? null : $kq['loi'];
+        $thongBao = $kq['ok'] ? 'Da tao voucher' : null;
+        $data = $admin->trangVoucher();
+        $ctrl->render('admin/voucher.php', $data + compact('thongBao', 'loi') + ['act' => 'voucher']);
         break;
 
-    case "capnhattrangthai":
-        if (isset($_GET['su_co'])) {
-            header("Location: index.php?act=donhang&msg=bom_hang");
-        } elseif (isset($_GET['next_step']) && $_GET['next_step'] === 'thanhcong') {
-            header("Location: index.php?act=donhang&msg=completed");
-        } else {
-            header("Location: index.php?act=donhang&msg=status_updated");
-        }
-        exit();
+    case 'xoavoucher':
+        $admin->xoaVoucher((int) ($_GET['id'] ?? $_POST['id'] ?? 0));
+        $data = $admin->trangVoucher();
+        $ctrl->render('admin/voucher.php', $data + ['thongBao' => 'Da xoa voucher', 'loi' => null, 'act' => 'voucher']);
+        break;
 
-    // ========================================================
-    // [A8] THỐNG KÊ DOANH THU & TOP BÁN CHẠY / BÁN Ế [12/5]
-    // ========================================================
-    case "doanhthu":
-        include __DIR__ . "/../../view/admin/doanhthu.php";
+    case 'khuyenmai':
+        $data = $admin->trangKhuyenMai();
+        $ctrl->render('admin/khuyenmai.php', $data + compact('thongBao', 'loi') + ['act' => $act]);
+        break;
+
+    case 'themkhuyenmai':
+        $kq = $admin->themKhuyenMai($_POST);
+        $loi = $kq['ok'] ? null : $kq['loi'];
+        $thongBao = $kq['ok'] ? 'Da tao khuyen mai' : null;
+        $data = $admin->trangKhuyenMai();
+        $ctrl->render('admin/khuyenmai.php', $data + compact('thongBao', 'loi') + ['act' => 'khuyenmai']);
+        break;
+
+    case 'donhang':
+        $data = $admin->trangDonHang();
+        $ctrl->render('admin/donhang.php', $data + compact('thongBao', 'loi') + ['act' => $act]);
+        break;
+
+    case 'chitietdonhang':
+        $kq = $admin->chiTietDonHang((int) ($_GET['id'] ?? 0));
+        $ctrl->render('admin/donhang.php', [
+            'ds_donhang' => $admin->trangDonHang()['ds_donhang'],
+            'chitiet' => $kq['ok'] ? $kq['donhang'] : null,
+            'thongBao' => null,
+            'loi' => $kq['ok'] ? null : $kq['loi'],
+            'act' => $act,
+        ]);
+        break;
+
+    case 'capnhattrangthai':
+        $kq = $admin->capNhatTrangThai(
+            (int) ($_POST['id'] ?? $_GET['id'] ?? 0),
+            (string) ($_POST['trang_thai'] ?? $_GET['trang_thai'] ?? ''),
+            (string) ($_POST['ly_do'] ?? '')
+        );
+        $loi = $kq['ok'] ? null : $kq['loi'];
+        $thongBao = $kq['ok'] ? 'Da cap nhat trang thai' : null;
+        $data = $admin->trangDonHang();
+        $ctrl->render('admin/donhang.php', $data + compact('thongBao', 'loi') + ['act' => 'donhang']);
+        break;
+
+    case 'doanhthu':
+        $ky = $_GET['ky'] ?? 'thang';
+        $data = $admin->doanhThu($ky);
+        $ctrl->render('admin/doanhthu.php', $data + compact('thongBao', 'loi', 'ky') + ['act' => $act]);
         break;
 
     default:
-        include __DIR__ . "/../../view/admin/sanpham.php";
-        break;
+        $ctrl->json(['ok' => false, 'loi' => 'Khong ro act admin', 'act' => $act], 400);
 }
-?>
-

@@ -11,13 +11,34 @@ if (!isset($img_path)) {
 }
 
 // Tính tổng tiền giỏ hàng
+$cart_items = [];
 $tam_tinh = 0;
-if (isset($_SESSION['giohang']) && is_array($_SESSION['giohang'])) {
-    foreach ($_SESSION['giohang'] as $sp) {
-        $tam_tinh += ((float)$sp[2] * (int)$sp[3]);
+if (isset($giohang['items']) && is_array($giohang['items'])) {
+    foreach ($giohang['items'] as $it) {
+        $cart_items[] = [
+            $it['id'],
+            $it['ten_sp'],
+            $it['gia'],
+            $it['so_luong'],
+            $it['hinh'] ?: 'iphone 15 pro max.jpeg'
+        ];
+        $tam_tinh += ($it['gia'] * $it['so_luong']);
+    }
+} elseif (isset($_SESSION['giohang']) && is_array($_SESSION['giohang'])) {
+    foreach ($_SESSION['giohang'] as $k => $sp) {
+        if (is_array($sp)) {
+            $cart_items[] = $sp;
+            $tam_tinh += ((float)$sp[2] * (int)$sp[3]);
+        } elseif (is_numeric($sp) && class_exists('sanpham')) {
+            $spInfo = (new sanpham())->layChiTiet((int)$k);
+            if ($spInfo) {
+                $cart_items[] = [$spInfo['id'], $spInfo['ten_sp'], (float)$spInfo['gia'], (int)$sp, $spInfo['hinh'] ?: 'iphone 15 pro max.jpeg'];
+                $tam_tinh += ((float)$spInfo['gia'] * (int)$sp);
+            }
+        }
     }
 }
-$phi_ship = ($tam_tinh > 0) ? 50000 : 0;
+$phi_ship = ($tam_tinh > 0) ? (isset($user['hang']) && in_array($user['hang'], ['Gold', 'Diamond']) ? 0 : 30000) : 0;
 ?>
 
 <div class="container my-5">
@@ -30,11 +51,11 @@ $phi_ship = ($tam_tinh > 0) ? 50000 : 0;
         </a>
     </div>
 
-    <?php if (isset($_GET['success'])): ?>
+    <?php if ((isset($ok) && $ok) || isset($_GET['success'])): ?>
         <div class="card border-0 shadow-sm rounded-4 p-5 text-center bg-white border-blue">
             <div class="display-3 text-success mb-3"><i class="fas fa-check-circle"></i></div>
             <h3 class="fw-bold text-success">Đặt Hàng Thành Công!</h3>
-            <p class="text-secondary fs-5">Mã đơn hàng: <strong class="text-dark">#DH-<?=strtoupper(substr(md5(time()), 0, 8))?></strong></p>
+            <p class="text-secondary fs-5">Mã đơn hàng: <strong class="text-dark">#DH-<?=isset($id_don) ? $id_don : strtoupper(substr(md5(time()), 0, 8))?></strong></p>
             <div class="alert alert-info rounded-3 text-start mx-auto p-4 small" style="max-width: 600px;">
                 <p class="mb-2"><strong><i class="fas fa-shield-alt text-primary"></i> Quy trình hệ thống đã tự động thực hiện [12/5] [19/5]:</strong></p>
                 <ul class="mb-0 ps-3 text-muted lh-lg">
@@ -151,7 +172,7 @@ $phi_ship = ($tam_tinh > 0) ? 50000 : 0;
                         </h5>
 
                         <div class="input-group mb-2">
-                            <input type="text" id="voucherInput" class="form-control rounded-start-pill text-uppercase" placeholder="Nhập mã: CHAOBAN, FREESHIP..." value="CHAOBAN">
+                            <input type="text" id="voucherInput" name="ma_voucher" class="form-control rounded-start-pill text-uppercase" placeholder="Nhập mã: CHAOBAN, FREESHIP..." value="CHAOBAN">
                             <button type="button" class="btn btn-primary rounded-end-pill px-3 fw-bold" onclick="applyVoucher()">
                                 Áp dụng
                             </button>
@@ -189,8 +210,8 @@ $phi_ship = ($tam_tinh > 0) ? 50000 : 0;
                         </h5>
 
                         <div class="order-items-list mb-3" style="max-height: 240px; overflow-y: auto;">
-                            <?php if (!empty($_SESSION['giohang'])): ?>
-                                <?php foreach ($_SESSION['giohang'] as $sp): ?>
+                            <?php if (!empty($cart_items)): ?>
+                                <?php foreach ($cart_items as $sp): ?>
                                     <div class="d-flex align-items-center justify-content-between py-2 border-bottom">
                                         <div class="d-flex align-items-center gap-2">
                                             <img src="<?=$img_path . ($sp[4] ?? 'iphone 15 pro max.jpeg')?>" alt="<?=$sp[1]?>" style="width: 40px; height: 40px; object-fit: contain;" class="rounded border">

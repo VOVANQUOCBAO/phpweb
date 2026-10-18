@@ -1,0 +1,276 @@
+<?php
+
+require_once __DIR__ . '/xl_database.php';
+
+class sanpham extends xl_database
+{
+    public function layDS(string $sapXep = 'moi'): array
+    {
+        $order = $sapXep === 'cu' ? 'ngay_tao ASC, id ASC' : 'ngay_tao DESC, id DESC';
+        return $this->select("SELECT * FROM sanpham ORDER BY {$order}");
+    }
+
+    public function layDSMoi(int $limit = 12): array
+    {
+        $limit = max(1, min(100, $limit));
+        return $this->select("SELECT * FROM sanpham ORDER BY ngay_tao DESC, id DESC LIMIT {$limit}");
+    }
+
+    public function timKiem(?string $tuKhoa = null, ?int $idDm = null, string $sapXep = 'moi', ?int $limit = null, int $offset = 0): array
+    {
+        $order = $sapXep === 'cu' ? 'ngay_tao ASC, id ASC' : 'ngay_tao DESC, id DESC';
+        $sql = 'SELECT * FROM sanpham WHERE 1=1';
+        $params = [];
+        if ($tuKhoa !== null && trim($tuKhoa) !== '') {
+            $sql .= ' AND (ten_sp LIKE ? OR ma_sp LIKE ? OR mo_ta LIKE ?)';
+            $kw = '%' . trim($tuKhoa) . '%';
+            $params[] = $kw;
+            $params[] = $kw;
+            $params[] = $kw;
+        }
+        if ($idDm !== null && $idDm > 0) {
+            $sql .= ' AND id_danhmuc = ?';
+            $params[] = $idDm;
+        }
+        $sql .= " ORDER BY {$order}";
+        if ($limit !== null) {
+            $sql .= ' LIMIT ' . max(1, min(100, $limit)) . ' OFFSET ' . max(0, $offset);
+        }
+        return $this->select($sql, $params);
+    }
+
+    public function demTimKiem(?string $tuKhoa = null, ?int $idDm = null): int
+    {
+        $sql = 'SELECT COUNT(*) AS tong FROM sanpham WHERE 1=1';
+        $params = [];
+        if ($tuKhoa !== null && trim($tuKhoa) !== '') {
+            $sql .= ' AND (ten_sp LIKE ? OR ma_sp LIKE ? OR mo_ta LIKE ?)';
+            $kw = '%' . trim($tuKhoa) . '%';
+            $params = [$kw, $kw, $kw];
+        }
+        if ($idDm !== null && $idDm > 0) {
+            $sql .= ' AND id_danhmuc = ?';
+            $params[] = $idDm;
+        }
+        return (int) $this->selectOne($sql, $params)['tong'];
+    }
+
+    public function layDSKhuyenMai(int $limit = 12): array
+    {
+        $limit = max(1, min(100, $limit));
+        return $this->select("SELECT sp.* FROM sanpham sp WHERE EXISTS (
+            SELECT 1 FROM khuyenmai km WHERE CURDATE() BETWEEN km.ngay_bd AND km.ngay_kt
+            AND ((km.loai = 'sanpham' AND km.id_sanpham = sp.id)
+              OR (km.loai = 'danhmuc' AND km.id_danhmuc = sp.id_danhmuc))
+            ) ORDER BY sp.ngay_tao DESC, sp.id DESC LIMIT {$limit}");
+    }
+
+    public function layChiTiet(int $id): ?array
+    {
+        return $this->selectOne('SELECT * FROM sanpham WHERE id = ?', [$id]);
+    }
+
+    public function layTheoMa(string $maSp): ?array
+    {
+        return $this->selectOne('SELECT * FROM sanpham WHERE ma_sp = ?', [$maSp]);
+    }
+
+    public function them(array $data): array
+    {
+        $loi = $this->kiemTraDuLieu($data);
+        if ($loi !== null) {
+            return ['ok' => false, 'loi' => $loi];
+        }
+        $ma = trim((string) ($data['ma_sp'] ?? ''));
+        if ($ma === '') {
+            return ['ok' => false, 'loi' => 'Bat buoc nhap ma san pham'];
+        }
+        if ($this->layTheoMa($ma) !== null) {
+            return ['ok' => false, 'loi' => 'Ma san pham da ton tai'];
+        }
+        $goc = (int) ($data['so_luong_goc'] ?? 0);
+        $ton = (int) ($data['so_luong_ton'] ?? $goc);
+        $check = $this->kiemTraSoLuong($goc, $ton);
+        if ($check !== null) {
+            return ['ok' => false, 'loi' => $check];
+        }
+        $id = $this->insert('sanpham', [
+            'ma_sp' => $ma,
+            'ten_sp' => trim((string) ($data['ten_sp'] ?? '')),
+            'id_danhmuc' => (int) ($data['id_danhmuc'] ?? 0),
+            'gia' => (float) ($data['gia'] ?? 0),
+            'so_luong_goc' => $goc,
+            'so_luong_ton' => $ton,
+            'hinh' => $data['hinh'] ?? null,
+            'mo_ta' => $data['mo_ta'] ?? null,
+            'han_su_dung' => $data['han_su_dung'] ?? null,
+        ]);
+        return ['ok' => true, 'id' => $id];
+    }
+
+    public function sua(int $id, array $data): array
+    {
+        $sp = $this->layChiTiet($id);
+        if ($sp === null) {
+            return ['ok' => false, 'loi' => 'Khong tim thay san pham'];
+        }
+        $data = array_replace($sp, $data);
+        if ((int) $data['so_luong_goc'] !== (int) $sp['so_luong_goc']) {
+            return ['ok' => false, 'loi' => 'Khong duoc doi so luong tao ban dau'];
+        }
+        $loi = $this->kiemTraDuLieu($data);
+        if ($loi !== null) {
+            return ['ok' => false, 'loi' => $loi];
+        }
+        $goc = array_key_exists('so_luong_goc', $data) ? (int) $data['so_luong_goc'] : (int) $sp['so_luong_goc'];
+        $ton = array_key_exists('so_luong_ton', $data) ? (int) $data['so_luong_ton'] : (int) $sp['so_luong_ton'];
+        $check = $this->kiemTraSoLuong($goc, $ton);
+        if ($check !== null) {
+            return ['ok' => false, 'loi' => $check];
+        }
+        $fields = [
+            'ten_sp' => trim((string) ($data['ten_sp'] ?? $sp['ten_sp'])),
+            'id_danhmuc' => (int) ($data['id_danhmuc'] ?? $sp['id_danhmuc']),
+            'gia' => (float) ($data['gia'] ?? $sp['gia']),
+            'so_luong_goc' => $goc,
+            'so_luong_ton' => $ton,
+            'hinh' => $data['hinh'] ?? $sp['hinh'],
+            'mo_ta' => $data['mo_ta'] ?? $sp['mo_ta'],
+            'han_su_dung' => $data['han_su_dung'] ?? $sp['han_su_dung'],
+        ];
+        if (!empty($data['ma_sp']) && $data['ma_sp'] !== $sp['ma_sp']) {
+            if ($this->layTheoMa((string) $data['ma_sp']) !== null) {
+                return ['ok' => false, 'loi' => 'Ma san pham da ton tai'];
+            }
+            $fields['ma_sp'] = trim((string) $data['ma_sp']);
+        }
+        $this->update('sanpham', $fields, 'id = ?', [$id]);
+        return ['ok' => true];
+    }
+
+    public function xoa(int $id): array
+    {
+        try {
+            $this->begin();
+            if ($this->selectOne('SELECT id FROM sanpham WHERE id = ? FOR UPDATE', [$id]) === null) {
+                $this->rollback();
+                return ['ok' => false, 'loi' => 'Khong tim thay san pham'];
+            }
+            $daBan = $this->selectOne(
+                'SELECT COUNT(*) AS c FROM chitietdonhang WHERE id_sanpham = ?',
+                [$id]
+            );
+            if ((int) ($daBan['c'] ?? 0) > 0) {
+                $this->rollback();
+                return ['ok' => false, 'loi' => 'San pham da co giao dich, khong duoc xoa'];
+            }
+            $this->delete('danhgia', 'id_sanpham = ?', [$id]);
+            $this->delete('khuyenmai', 'id_sanpham = ?', [$id]);
+            $this->delete('sanpham', 'id = ?', [$id]);
+            $this->commit();
+            return ['ok' => true];
+        } catch (Throwable $e) {
+            $this->rollback();
+            throw $e;
+        }
+    }
+
+    public function truTon(int $id, int $sl): array
+    {
+        if ($sl <= 0) {
+            return ['ok' => false, 'loi' => 'So luong khong hop le'];
+        }
+        $n = $this->execute(
+            'UPDATE sanpham SET so_luong_ton = so_luong_ton - ? WHERE id = ? AND so_luong_ton >= ?',
+            [$sl, $id, $sl]
+        );
+        if ($n === 0) {
+            return ['ok' => false, 'loi' => 'Khong du so luong ton kho'];
+        }
+        return ['ok' => true];
+    }
+
+    public function congTon(int $id, int $sl): array
+    {
+        if ($sl <= 0) {
+            return ['ok' => false, 'loi' => 'So luong khong hop le'];
+        }
+        $this->execute('UPDATE sanpham SET so_luong_ton = LEAST(so_luong_goc, so_luong_ton + ?) WHERE id = ?', [$sl, $id]);
+        $sp = $this->layChiTiet($id);
+        return $sp === null ? ['ok' => false, 'loi' => 'Khong tim thay san pham']
+            : ['ok' => true, 'so_luong_ton' => (int) $sp['so_luong_ton']];
+    }
+
+    public function canhBaoSapHet(int $nguong = 5): array
+    {
+        return $this->select(
+            'SELECT * FROM sanpham WHERE so_luong_ton <= ?',
+            [$nguong]
+        );
+    }
+
+    public function hangE(int $soNgay = 30, int $nguongBan = 2): array
+    {
+        return $this->select(
+            'SELECT sp.*, COALESCE(ban.da_ban, 0) AS da_ban
+             FROM sanpham sp
+             LEFT JOIN (
+                SELECT ct.id_sanpham, SUM(ct.so_luong) AS da_ban
+                FROM chitietdonhang ct
+                JOIN donhang dh ON dh.id = ct.id_donhang
+                WHERE dh.trang_thai = ?
+                GROUP BY ct.id_sanpham
+             ) ban ON ban.id_sanpham = sp.id
+             WHERE sp.ngay_tao <= DATE_SUB(NOW(), INTERVAL ? DAY)
+               AND COALESCE(ban.da_ban, 0) <= ?',
+            ['Thành công', $soNgay, $nguongBan]
+        );
+    }
+
+    public function canHan(int $soNgay = 14): array
+    {
+        return $this->select(
+            'SELECT * FROM sanpham
+             WHERE han_su_dung IS NOT NULL
+               AND han_su_dung <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
+               AND han_su_dung >= CURDATE()',
+            [$soNgay]
+        );
+    }
+
+    public function kiemTraSoLuong(int $goc, int $ton): ?string
+    {
+        if ($goc < 0 || $ton < 0) {
+            return 'So luong khong duoc am';
+        }
+        if ($ton > $goc) {
+            return 'So luong ton khong duoc vuot so luong goc';
+        }
+        return null;
+    }
+
+    private function kiemTraDuLieu(array $data): ?string
+    {
+        if (trim((string) ($data['ma_sp'] ?? '')) === '' || strlen((string) $data['ma_sp']) > 50) {
+            return 'Ma san pham bat buoc va toi da 50 ky tu';
+        }
+        if (trim((string) ($data['ten_sp'] ?? '')) === '') {
+            return 'Ten san pham khong duoc rong';
+        }
+        if (!$this->soTienHopLe($data['gia'] ?? null)) {
+            return 'Gia san pham khong hop le';
+        }
+        if (!$this->soNguyenHopLe($data['so_luong_goc'] ?? null)
+            || !$this->soNguyenHopLe($data['so_luong_ton'] ?? $data['so_luong_goc'])) {
+            return 'So luong phai la so nguyen khong am';
+        }
+        if (!$this->soNguyenHopLe($data['id_danhmuc'] ?? null, 1)
+            || $this->selectOne('SELECT id FROM danhmuc WHERE id = ?', [$data['id_danhmuc']]) === null) {
+            return 'Danh muc khong ton tai';
+        }
+        if (!empty($data['han_su_dung']) && !$this->ngayHopLe($data['han_su_dung'])) {
+            return 'Han su dung khong hop le';
+        }
+        return null;
+    }
+}

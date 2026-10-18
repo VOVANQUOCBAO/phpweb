@@ -15,6 +15,31 @@ if (!isset($_SESSION['giohang']) || !is_array($_SESSION['giohang'])) {
     $_SESSION['giohang'] = [];
 }
 
+$cart_items = [];
+if (isset($giohang['items']) && is_array($giohang['items'])) {
+    foreach ($giohang['items'] as $it) {
+        $cart_items[] = [
+            $it['id'],
+            $it['ten_sp'],
+            $it['gia'],
+            $it['so_luong'],
+            $it['hinh'] ?: 'iphone 15 pro max.jpeg',
+            $it['thanh_tien'] ?? ($it['gia'] * $it['so_luong'])
+        ];
+    }
+} elseif (isset($_SESSION['giohang']) && is_array($_SESSION['giohang'])) {
+    foreach ($_SESSION['giohang'] as $k => $it) {
+        if (is_array($it)) {
+            $cart_items[] = $it;
+        } elseif (is_numeric($it) && class_exists('sanpham')) {
+            $spInfo = (new sanpham())->layChiTiet((int)$k);
+            if ($spInfo) {
+                $cart_items[] = [$spInfo['id'], $spInfo['ten_sp'], (float)$spInfo['gia'], (int)$it, $spInfo['hinh'] ?: 'iphone 15 pro max.jpeg', (float)$spInfo['gia'] * (int)$it];
+            }
+        }
+    }
+}
+
 $tong_tien = 0;
 ?>
 
@@ -23,10 +48,10 @@ $tong_tien = 0;
         <h2 class="fw-bold text-primary mb-0">
             <i class="fas fa-shopping-cart me-2"></i> Giỏ Hàng Của Bạn (Lab 3.1)
         </h2>
-        <span class="badge bg-primary fs-6"><?=count($_SESSION['giohang'])?> sản phẩm</span>
+        <span class="badge bg-primary fs-6"><?=count($cart_items)?> sản phẩm</span>
     </div>
 
-    <?php if (empty($_SESSION['giohang'])): ?>
+    <?php if (empty($cart_items)): ?>
         <div class="text-center py-5 bg-white rounded-4 shadow-sm p-4">
             <div class="mb-3 text-muted display-1">
                 <i class="fas fa-cart-arrow-down"></i>
@@ -57,14 +82,14 @@ $tong_tien = 0;
                     </thead>
                     <tbody>
                         <?php
-                        for ($i = 0; $i < count($_SESSION['giohang']); $i++):
-                            $item = $_SESSION['giohang'][$i];
+                        for ($i = 0; $i < count($cart_items); $i++):
+                            $item = $cart_items[$i];
                             $id = $item[0];
                             $ten = $item[1];
                             $gia = (float)$item[2];
                             $sl = (int)$item[3];
                             $hinh = $item[4] ?? 'iphone 15 pro max.jpeg';
-                            $thanh_tien = $gia * $sl;
+                            $thanh_tien = isset($item[5]) ? (float)$item[5] : ($gia * $sl);
                             $tong_tien += $thanh_tien;
                         ?>
                         <tr>

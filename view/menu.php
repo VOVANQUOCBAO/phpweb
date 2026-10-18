@@ -3,7 +3,11 @@
 $cart_count = 0;
 if (isset($_SESSION['giohang']) && is_array($_SESSION['giohang'])) {
     foreach ($_SESSION['giohang'] as $item) {
-        $cart_count += isset($item[3]) ? (int)$item[3] : 1;
+        if (is_numeric($item)) {
+            $cart_count += (int)$item;
+        } elseif (is_array($item)) {
+            $cart_count += isset($item[3]) ? (int)$item[3] : (isset($item['so_luong']) ? (int)$item['so_luong'] : 1);
+        }
     }
 }
 $current_act = $_REQUEST['act'] ?? 'trangchu';
