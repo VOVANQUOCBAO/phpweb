@@ -259,7 +259,7 @@ function askAIQuick(text) {
 }
 
 // Xử lý AI phân tích và gợi ý sản phẩm
-function handleAISend(e) {
+async function handleAISend(e) {
     if (e) e.preventDefault();
     const input = document.getElementById('aiChatInput');
     const query = input.value.trim();
@@ -267,7 +267,6 @@ function handleAISend(e) {
 
     const chatBody = document.getElementById('aiChatBody');
 
-    // Thêm tin nhắn của User
     const userMsg = document.createElement('div');
     userMsg.className = 'chat-bubble-msg chat-bubble-user';
     userMsg.textContent = query;
@@ -275,50 +274,37 @@ function handleAISend(e) {
     input.value = '';
     chatBody.scrollTop = chatBody.scrollHeight;
 
-    // AI phân tích từ khóa và trả lời
-    setTimeout(() => {
+    const loadingMsg = document.createElement('div');
+    loadingMsg.className = 'chat-bubble-msg chat-bubble-bot';
+    loadingMsg.textContent = 'Đang tư vấn cho bạn...';
+    chatBody.appendChild(loadingMsg);
+    chatBody.scrollTop = chatBody.scrollHeight;
+
+    try {
+        const response = await fetch('index.php?act=chatbot&ajax=1', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ message: query })
+        });
+
+        const data = await response.json();
+        const reply = (data && data.reply) ? data.reply : 'Xin lỗi, hiện tại AI chưa phản hồi được. Bạn có thể thử lại sau.';
+
         const botMsg = document.createElement('div');
         botMsg.className = 'chat-bubble-msg chat-bubble-bot';
-        
-        const q = query.toLowerCase();
-        let reply = '';
-
-        if (q.includes('iphone') || q.includes('apple') || q.includes('16') || q.includes('15')) {
-            reply = `🔥 Gợi ý cho bạn dòng <strong>Apple iPhone</strong> đỉnh cao:
-            <ul class="mb-2 ps-3 mt-1">
-                <li><strong>iPhone 16 256GB</strong>: 28.990.000đ (Siêu phẩm mới nhất)</li>
-                <li><strong>iPhone 15 Pro Max 256GB</strong>: 29.990.000đ (Giảm 20%)</li>
-                <li><strong>iPhone 13 128GB</strong>: 13.990.000đ (Bán chạy, giá hời)</li>
-            </ul>
-            <a href="index.php?act=chitiet&id=1" class="btn btn-primary btn-sm rounded-pill text-white text-decoration-none">Xem iPhone 15 Pro Max</a>`;
-        } else if (q.includes('samsung') || q.includes('s24') || q.includes('ai')) {
-            reply = `✨ Bạn đang quan tâm dòng <strong>Samsung Galaxy AI</strong>:
-            <ul class="mb-2 ps-3 mt-1">
-                <li><strong>Samsung Galaxy S24 Ultra 5G</strong>: 28.990.000đ (Quyền năng AI đỉnh cao, bút S-Pen, viền Titanium)</li>
-            </ul>
-            <a href="index.php?act=chitiet&id=2" class="btn btn-primary btn-sm rounded-pill text-white text-decoration-none">Xem Galaxy S24 Ultra</a>`;
-        } else if (q.includes('dưới 15') || q.includes('rẻ') || q.includes('sinh viên') || q.includes('10 triệu')) {
-            reply = `💰 Phân khúc tầm trung giá tốt cho bạn:
-            <ul class="mb-2 ps-3 mt-1">
-                <li><strong>OPPO Reno11 F 5G</strong>: 8.990.000đ (Chuyên gia chân dung)</li>
-                <li><strong>iPhone 13 128GB</strong>: 13.990.000đ (Hiệu năng cực bền)</li>
-            </ul>
-            <a href="index.php?act=chitiet&id=4" class="btn btn-primary btn-sm rounded-pill text-white text-decoration-none">Xem OPPO Reno11 F</a>`;
-        } else if (q.includes('ảnh') || q.includes('chụp') || q.includes('leica') || q.includes('xiaomi')) {
-            reply = `📷 Siêu phẩm chụp ảnh chuyên nghiệp:
-            <ul class="mb-2 ps-3 mt-1">
-                <li><strong>Xiaomi 14 5G 256GB</strong>: 20.990.000đ (Ống kính huyền thoại Leica)</li>
-                <li><strong>Samsung S24 Ultra</strong>: Camera 200MP Zoom 100x</li>
-            </ul>
-            <a href="index.php?act=chitiet&id=3" class="btn btn-primary btn-sm rounded-pill text-white text-decoration-none">Xem Xiaomi 14 Leica</a>`;
-        } else {
-            reply = `Cảm ơn bạn đã nhắn! ĐiệnThoạiZ hiện đang có chương trình khuyến mãi lớn cho các dòng <strong>iPhone 16, Samsung Galaxy S24 Ultra, Xiaomi 14 và OPPO Reno11</strong>. Bạn có muốn xem danh sách ưu đãi hôm nay không?`;
-        }
-
         botMsg.innerHTML = reply;
-        chatBody.appendChild(botMsg);
+        chatBody.replaceChild(botMsg, loadingMsg);
         chatBody.scrollTop = chatBody.scrollHeight;
-    }, 600);
+    } catch (error) {
+        const botMsg = document.createElement('div');
+        botMsg.className = 'chat-bubble-msg chat-bubble-bot';
+        botMsg.textContent = 'AI tạm thời không phản hồi. Vui lòng thử lại sau vài giây.';
+        chatBody.replaceChild(botMsg, loadingMsg);
+        chatBody.scrollTop = chatBody.scrollHeight;
+    }
 }
 </script>
 </body>

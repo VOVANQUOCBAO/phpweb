@@ -13,6 +13,36 @@ try {
     $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$cfg['dbname']}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     $pdo->exec("USE `{$cfg['dbname']}`");
     $pdo->exec(file_get_contents(dirname(__DIR__, 2) . '/database/schema.sql'));
+    $admin = $pdo->query("SELECT id, mat_khau FROM nhanvien WHERE email = 'admin@local.test' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    $initialPassword = getenv('ADMIN_INITIAL_PASSWORD');
+    $hasConfiguredPassword = $initialPassword !== false && $initialPassword !== '';
+    $rotatePassword = $admin === false || $hasConfiguredPassword;
+    if ($rotatePassword) {
+        $generatedPassword = !$hasConfiguredPassword;
+        if ($generatedPassword) {
+            $initialPassword = bin2hex(random_bytes(16));
+        } elseif (strlen($initialPassword) < 12) {
+            throw new RuntimeException('ADMIN_INITIAL_PASSWORD phai co it nhat 12 ky tu');
+        }
+        $hash = password_hash($initialPassword, PASSWORD_DEFAULT);
+        if ($admin === false) {
+            $stmt = $pdo->prepare(
+                'INSERT INTO nhanvien (ho_ten, email, mat_khau, vai_tro, trang_thai)
+                 VALUES (?, ?, ?, ?, 1)'
+            );
+            $stmt->execute(['Quản trị viên', 'admin@local.test', $hash, 'Admin']);
+        } else {
+            $stmt = $pdo->prepare('UPDATE nhanvien SET mat_khau = ?, vai_tro = ?, trang_thai = 1 WHERE id = ?');
+            $stmt->execute([$hash, 'Admin', $admin['id']]);
+        }
+        echo "Da tao/cap nhat tai khoan quan tri admin@local.test.\n";
+        if ($generatedPassword) {
+            echo "Mat khau khoi tao (chi hien thi lan nay): {$initialPassword}\n";
+            echo "Hay luu mat khau nay o noi an toan.\n";
+        } else {
+            echo "Da dung mat khau duoc cung cap qua ADMIN_INITIAL_PASSWORD.\n";
+        }
+    }
     echo "Da khoi tao {$cfg['dbname']} tai {$cfg['host']}:{$cfg['port']}; giu nguyen du lieu cu.\n";
 } catch (Throwable $e) {
     fwrite(STDERR, "Khong khoi tao duoc CSDL: {$e->getMessage()}\n");

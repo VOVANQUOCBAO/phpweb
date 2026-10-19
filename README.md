@@ -37,3 +37,5 @@ phpweb/
 **Kiểm thử:** 67/67 ca đạt, bao gồm luồng HTTP, Session, rollback và xử lý đồng thời. Test dùng CSDL tạm riêng, giữ nguyên dữ liệu ứng dụng.
 
 **Email:** có sẵn PHPMailer. Gửi Gmail thật cần `SMTP_USER` và `SMTP_PASS`; khi chưa cấu hình, hệ thống vẫn lưu bản sao thư trong CSDL.
+
+**Chatbox AI:** khung chat ở footer đã hoạt động với phản hồi mặc định. Để bật AI thật, tạo `support/config/chatbot.local.php` dựa trên `support/config/chatbot.example.php` và điền key API. Nếu không cấu hình hoặc key không hợp lệ, chatbot sẽ tự động dùng logic gợi ý sản phẩm của website.

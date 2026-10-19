@@ -24,6 +24,7 @@ $server = null;
 $adminPdo = null;
 $testDb = null;
 $cfg = csdl::cauHinh();
+$mainDb = $cfg['dbname'];
 $oldEnv = [];
 foreach (['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASS', 'SMTP_USER', 'SMTP_PASS'] as $key) {
     $oldEnv[$key] = getenv($key);
@@ -120,7 +121,8 @@ function race(string $action, array $args): array
 
 function request(string $base, string &$cookie, string $act = '', ?array $post = null, string $path = '/controller/index.php'): array
 {
-    $url = $base . $path . ($act !== '' ? '?act=' . $act : '');
+    $separator = str_contains($path, '?') ? '&' : '?';
+    $url = $base . $path . ($act !== '' ? $separator . 'act=' . $act : '');
     $headers = 'Cookie: ' . $cookie . "\r\n";
     if ($post !== null) {
         $headers .= "Content-Type: application/x-www-form-urlencoded\r\n";
@@ -140,8 +142,24 @@ function request(string $base, string &$cookie, string $act = '', ?array $post =
             $location = substr($header, 10);
         }
     }
-    $data = $raw === false || $raw === '' ? null : json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+    if ($raw === false || $raw === '') {
+        $data = null;
+    } else {
+        try {
+            $data = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            $data = $raw;
+        }
+    }
     return ['status' => $status, 'data' => $data, 'location' => $location];
+}
+
+function renderAdminView(array $data): string
+{
+    extract($data, EXTR_SKIP);
+    ob_start();
+    require BASE_PATH . '/view/admin/sanpham.php';
+    return (string) ob_get_clean();
 }
 
 function counts(PDO $pdo, string $db): array
@@ -172,9 +190,16 @@ try {
     csdl::resetKetNoi();
     $pdo = csdl::shared();
     $pdo->exec(file_get_contents(BASE_PATH . '/database/schema.sql'));
-    // Import lan hai phai giu nguyen du lieu va khong trung tai khoan seed.
+    ob_start();
+    require BASE_PATH . '/support/scripts/khoitao_csdl.php';
+    $setupOutput = ob_get_clean();
+    preg_match('/Mat khau khoi tao \(chi hien thi lan nay\): ([a-f0-9]{32})/', $setupOutput, $adminPassword);
+    $adminPassword = $adminPassword[1] ?? '';
+    // Import lan hai khong ghi de tai khoan quan tri da duoc khoi tao an toan.
     $pdo->exec(file_get_contents(BASE_PATH . '/database/schema.sql'));
-    check('CSDL rieng + import SQL lap lai khong xoa du lieu', counts($pdo, $testDb)['nhanvien'] === 1);
+    check('CSDL rieng + import SQL lap lai giu tai khoan quan tri', counts($pdo, $testDb)['nhanvien'] === 1
+        && $adminPassword !== ''
+        && (new nhanvien())->kiemTraDangNhap('admin@local.test', $adminPassword)['ok']);
 
     $dm = new danhmuc();
     $sp = new sanpham();
@@ -357,6 +382,50 @@ try {
         throw new RuntimeException('Server HTTP khong khoi dong');
     }
     $base = 'http://' . $addr;
+    $adminCookie = '';
+    $adminPath = '/controller/index.php?khu=admin';
+    $r = request($base, $adminCookie, 'dangnhap', [
+        'admin_user' => 'admin@local.test', 'admin_pass' => $adminPassword,
+    ], $adminPath);
+    check('HTTP dang nhap Admin khong can thong tin dien san', $r['status'] === 302 && $adminCookie !== '');
+    $r = request($base, $adminCookie, 'sanpham', null, $adminPath);
+    $_SESSION['admin'] = ['hoten' => 'Admin test'];
+    $adminHtml = is_array($r['data']) ? renderAdminView($r['data']) : '';
+    check('HTTP trang Admin hien san pham/danh muc tu CSDL', $r['status'] === 200
+        && str_contains($adminHtml, 'Quản lý danh mục') && str_contains($adminHtml, 'Danh sách sản phẩm'));
+    $r = request($base, $adminCookie, 'themsanpham', [
+        'ma_sp' => 'ADMIN-HTTP', 'ten_sp' => 'Sản phẩm Admin HTTP', 'id_danhmuc' => $idDm,
+        'gia' => 900000, 'so_luong_goc' => 10, 'so_luong_ton' => 4, 'mo_ta' => 'Thêm qua trang quản trị',
+    ], $adminPath);
+    $adminSp = $sp->layTheoMa('ADMIN-HTTP');
+    check('HTTP Admin them san pham ghi dung du lieu CSDL', $r['status'] === 200
+        && $adminSp !== null && (int) $adminSp['so_luong_goc'] === 10 && (int) $adminSp['so_luong_ton'] === 4);
+    $r = request($base, $adminCookie, 'suasanpham', [
+        'id' => $adminSp['id'], 'ma_sp' => 'ADMIN-HTTP', 'ten_sp' => 'Sản phẩm đã sửa',
+        'id_danhmuc' => $idDm, 'gia' => 950000, 'so_luong_goc' => 10, 'so_luong_ton' => 11,
+    ], $adminPath);
+    check('HTTP Admin chan sua ton vuot so luong goc', $r['status'] === 200
+        && $sp->layChiTiet((int) $adminSp['id'])['ten_sp'] === 'Sản phẩm Admin HTTP');
+    $r = request($base, $adminCookie, 'danhmuc', [
+        'hanh_dong' => 'them', 'ten_danhmuc' => 'Danh mục Admin HTTP', 'mo_ta' => 'Tạo từ trang quản trị',
+    ], $adminPath);
+    $adminDm = $dm->selectOne('SELECT id FROM danhmuc WHERE ten_danhmuc = ?', ['Danh mục Admin HTTP']);
+    check('HTTP Admin them danh muc ghi vao CSDL', $r['status'] === 200 && $adminDm !== null);
+    $r = request($base, $adminCookie, 'danhmuc', [
+        'hanh_dong' => 'sua', 'id' => $adminDm['id'],
+        'ten_danhmuc' => 'Danh mục Admin HTTP sửa', 'mo_ta' => 'Đã cập nhật',
+    ], $adminPath);
+    check('HTTP Admin sua danh muc cap nhat CSDL', $r['status'] === 200
+        && $dm->layTheoId((int) $adminDm['id'])['ten_danhmuc'] === 'Danh mục Admin HTTP sửa');
+    $r = request($base, $adminCookie, 'danhmuc', [
+        'hanh_dong' => 'xoa', 'id' => $adminDm['id'],
+    ], $adminPath);
+    check('HTTP Admin xoa danh muc trong CSDL', $r['status'] === 200
+        && $dm->layTheoId((int) $adminDm['id']) === null);
+    $r = request($base, $adminCookie, 'xoasanpham', ['id' => $adminSp['id']], $adminPath);
+    check('HTTP Admin xoa san pham chua giao dich', $r['status'] === 200
+        && $sp->layChiTiet((int) $adminSp['id']) === null);
+
     $cookie = '';
     $r = request($base, $cookie, 'timkiem', null, '/index.php');
     check('HTTP index goc chuyen huong dung controller va giu act', $r['status'] === 302 && $r['location'] === 'controller/index.php?act=timkiem');
@@ -454,7 +523,7 @@ try {
         $adminPdo->exec("DROP DATABASE {$testDb}");
     }
     if ($adminPdo !== null && isset($mainBefore)) {
-        check('CSDL ung dung giu nguyen so ban ghi sau toan bo test', $mainBefore === counts($adminPdo, $cfg['dbname']));
+        check('CSDL ung dung giu nguyen so ban ghi sau toan bo test', $mainBefore === counts($adminPdo, $mainDb));
     }
     foreach ($oldEnv as $key => $value) {
         putenv($value === false ? $key : "{$key}={$value}");

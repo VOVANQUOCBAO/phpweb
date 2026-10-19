@@ -107,11 +107,17 @@ $current_act = $_REQUEST['act'] ?? 'trangchu';
                     </li>
                 <?php endif; ?>
 
-                <!-- Nút tắt vào khu vực Quản trị Admin -->
+                <!-- Nút vào khu vực Quản trị Admin -->
                 <li class="nav-item ms-lg-2">
-                    <a class="btn btn-outline-light btn-sm rounded-pill px-3" href="index.php?act=admin" target="_blank" title="Khu vực quản trị dành cho nhân viên">
-                        <i class="fas fa-user-shield me-1"></i> Admin
-                    </a>
+                    <?php if (isset($_SESSION['admin'])): ?>
+                        <a class="btn btn-warning btn-sm rounded-pill px-3 fw-bold text-dark shadow-sm" href="index.php?khu=admin&act=sanpham" title="Vào trang quản trị">
+                            <i class="fas fa-shield-halved me-1 text-danger"></i> Quản Trị Hệ Thống
+                        </a>
+                    <?php else: ?>
+                        <a class="btn btn-outline-light btn-sm rounded-pill px-3" href="index.php?act=admin" title="Khu vực quản trị hệ thống">
+                            <i class="fas fa-user-shield me-1"></i> Admin
+                        </a>
+                    <?php endif; ?>
                 </li>
             </ul>
         </div>

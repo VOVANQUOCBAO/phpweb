@@ -9,6 +9,28 @@ if (!isset($base_url)) {
         $base_url = '../../view';
     }
 }
+
+// Tải cấu hình giao diện do Quản trị viên thiết lập từ Admin
+$theme_file = dirname(__DIR__) . '/support/config/theme.json';
+$theme_cfg = ['season' => 'default', 'font' => 'font-segoe', 'bg' => 'bg-light-gray'];
+if (is_file($theme_file)) {
+    $theme_saved = json_decode((string)file_get_contents($theme_file), true);
+    if (is_array($theme_saved)) {
+        $theme_cfg = array_merge($theme_cfg, $theme_saved);
+    }
+}
+
+$body_classes = [];
+if (!empty($theme_cfg['season']) && $theme_cfg['season'] !== 'default') {
+    $body_classes[] = htmlspecialchars($theme_cfg['season']);
+}
+if (!empty($theme_cfg['font'])) {
+    $body_classes[] = htmlspecialchars($theme_cfg['font']);
+}
+if (!empty($theme_cfg['bg'])) {
+    $body_classes[] = htmlspecialchars($theme_cfg['bg']);
+}
+$body_class_attr = !empty($body_classes) ? ' class="' . implode(' ', $body_classes) . '"' : '';
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -25,42 +47,26 @@ if (!isset($base_url)) {
     <!-- Nhúng CSS tùy chỉnh (theme.css) -->
     <link rel="stylesheet" href="<?=$base_url?>/css/theme.css">
 </head>
-<body>
-    <!-- THANH CÔNG CỤ TÙY BIẾN GIAO DIỆN THEO MÙA, FONT & BACKGROUND [17/6] [24/6] -->
-    <div class="theme-toolbar py-1">
+<body<?=$body_class_attr?>>
+    <!-- THANH TIỆN ÍCH TRÊN CÙNG (DÀNH CHO KHÁCH HÀNG & PHÍM TẮT QUẢN TRỊ ADMIN) -->
+    <div class="theme-toolbar py-1 bg-dark text-white-50">
         <div class="container d-flex flex-wrap justify-content-between align-items-center">
             <div class="d-flex align-items-center gap-3">
-                <span class="small d-none d-md-inline"><i class="fas fa-headset me-1 text-warning"></i> Hotline: <strong>1800.6868</strong> (Miễn phí)</span>
-                <span class="small d-none d-lg-inline"><i class="fas fa-truck-fast me-1 text-info"></i> Giao siêu tốc 1h</span>
+                <span class="small"><i class="fas fa-headset me-1 text-warning"></i> Hotline: <strong class="text-white">1800.6868</strong> (Miễn phí)</span>
+                <span class="small d-none d-md-inline"><i class="fas fa-truck-fast me-1 text-info"></i> Giao siêu tốc 1h</span>
+                <span class="small d-none d-lg-inline"><i class="fas fa-shield-alt me-1 text-success"></i> 100% Chính hãng VN/A</span>
             </div>
             <div class="d-flex align-items-center gap-2 small">
-                <!-- Bộ chọn Chủ đề Mùa -->
-                <label for="seasonSelect" class="d-none d-sm-inline"><i class="fas fa-palette me-1"></i> Mùa:</label>
-                <select id="seasonSelect" onchange="changeThemeSeason(this.value)">
-                    <option value="default">🔵 Xanh Samsung/TGDD</option>
-                    <option value="theme-spring">🌸 Xuân Tài Lộc</option>
-                    <option value="theme-summer">☀️ Hạ Sôi Động</option>
-                    <option value="theme-autumn">🍂 Thu Quý Phái</option>
-                    <option value="theme-winter">❄️ Đông Băng Tuyết</option>
-                </select>
-
-                <!-- Bộ chọn Font chữ -->
-                <label for="fontSelect" class="d-none d-md-inline ms-2"><i class="fas fa-font me-1"></i> Font:</label>
-                <select id="fontSelect" onchange="changeFontFamily(this.value)">
-                    <option value="font-segoe">Segoe UI</option>
-                    <option value="font-bevietnam">Be Vietnam Pro</option>
-                    <option value="font-roboto">Roboto</option>
-                    <option value="font-montserrat">Montserrat</option>
-                </select>
-
-                <!-- Bộ chọn Nền -->
-                <label for="bgSelect" class="d-none d-md-inline ms-2"><i class="fas fa-fill-drip me-1"></i> Nền:</label>
-                <select id="bgSelect" onchange="changeBackgroundMode(this.value)">
-                    <option value="bg-light-gray">Xám nhạt</option>
-                    <option value="bg-white-pure">Trắng tinh</option>
-                    <option value="bg-soft-blue">Xanh pastel</option>
-                </select>
+                <?php if (isset($_SESSION['admin'])): ?>
+                    <!-- Nút quản trị dành riêng cho tài khoản Admin khi duyệt giao diện người dùng -->
+                    <a href="index.php?khu=admin&act=giaodien" class="badge bg-warning text-dark text-decoration-none py-1 px-2 fw-bold shadow-sm">
+                        <i class="fas fa-palette me-1 text-danger"></i> Tùy biến giao diện (Admin)
+                    </a>
+                <?php else: ?>
+                    <span class="small text-white-50 d-none d-sm-inline">
+                        <i class="fas fa-certificate text-warning me-1"></i> Hệ thống bán lẻ điện thoại uy tín hàng đầu
+                    </span>
+                <?php endif; ?>
             </div>
         </div>
-    </div>
     </div>

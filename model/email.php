@@ -6,14 +6,22 @@ class email extends xl_database
 {
     public function cauHinhSmtp(): array
     {
-        return [
+        $cfg = [
             'host' => 'smtp.gmail.com',
             'port' => 587,
             'user' => getenv('SMTP_USER') ?: '',
             'pass' => getenv('SMTP_PASS') ?: '',
             'from' => getenv('SMTP_FROM') ?: (getenv('SMTP_USER') ?: 'noreply@localhost'),
-            'from_name' => 'Web ban hang MVC',
+            'from_name' => 'ĐiệnThoạiZ - Thế Giới Smartphone',
         ];
+        $file = dirname(__DIR__) . '/support/config/smtp.local.php';
+        if (is_file($file)) {
+            $local = require $file;
+            if (is_array($local)) {
+                $cfg = array_replace($cfg, $local);
+            }
+        }
+        return $cfg;
     }
 
     public function luuThu(int $idKhachHang, string $tieuDe, string $noiDung, string $loai = 'hethong'): int

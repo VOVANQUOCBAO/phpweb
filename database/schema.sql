@@ -25,7 +25,9 @@ CREATE TABLE IF NOT EXISTS sanpham (
 CREATE TABLE IF NOT EXISTS khachhang (
   id INT AUTO_INCREMENT PRIMARY KEY,
   ho_ten VARCHAR(150) NOT NULL,
+  ten_dang_nhap VARCHAR(100) NULL,
   email VARCHAR(150) NOT NULL UNIQUE,
+  sdt VARCHAR(20) NULL,
   mat_khau VARCHAR(255) NOT NULL,
   ngay_sinh DATE NULL,
   hang ENUM('Silver','Gold','Diamond') NOT NULL DEFAULT 'Silver',
@@ -115,13 +117,3 @@ CREATE TABLE IF NOT EXISTS email (
   loai VARCHAR(50) NOT NULL DEFAULT 'hethong',
   CONSTRAINT fk_em_kh FOREIGN KEY (id_khachhang) REFERENCES khachhang(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Mật khẩu mặc định: password  (password_hash bcrypt)
-INSERT INTO nhanvien (ho_ten, email, mat_khau, vai_tro, trang_thai)
-SELECT
-  'Quan tri',
-  'admin@local.test',
-  '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
-  'Admin',
-  1
-WHERE NOT EXISTS (SELECT 1 FROM nhanvien WHERE email = 'admin@local.test');

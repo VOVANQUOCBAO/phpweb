@@ -136,7 +136,7 @@ include "header_admin.php";
                     </div>
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Mật Khẩu Khởi Tạo</label>
-                        <input type="password" name="password" class="form-control" value="123456" required>
+                        <input type="password" name="password" class="form-control" placeholder="Đặt mật khẩu ban đầu" autocomplete="new-password" required>
                     </div>
                 </div>
                 <div class="modal-footer bg-light rounded-bottom-4">
@@ -152,4 +152,3 @@ include "header_admin.php";
     </main>
 </body>
 </html>
-

@@ -4,6 +4,19 @@ require_once __DIR__ . '/xl_database.php';
 
 class sanpham extends xl_database
 {
+    public function layDSAdmin(): array
+    {
+        return $this->select(
+            'SELECT sp.*, dm.ten_danhmuc,
+                    COALESCE(SUM(ct.so_luong), 0) AS da_ban
+             FROM sanpham sp
+             JOIN danhmuc dm ON dm.id = sp.id_danhmuc
+             LEFT JOIN chitietdonhang ct ON ct.id_sanpham = sp.id
+             GROUP BY sp.id
+             ORDER BY sp.ngay_tao DESC, sp.id DESC'
+        );
+    }
+
     public function layDS(string $sapXep = 'moi'): array
     {
         $order = $sapXep === 'cu' ? 'ngay_tao ASC, id ASC' : 'ngay_tao DESC, id DESC';
@@ -65,9 +78,48 @@ class sanpham extends xl_database
             ) ORDER BY sp.ngay_tao DESC, sp.id DESC LIMIT {$limit}");
     }
 
+    public function boSungThongTinReal(array &$sp): void
+    {
+        $id = (int)($sp['id'] ?? 0);
+        if ($id <= 0) {
+            return;
+        }
+        $sp['so_luong_ton'] = (int)($sp['so_luong_ton'] ?? 0);
+        $sp['so_luong_goc'] = (int)($sp['so_luong_goc'] ?? $sp['so_luong_ton']);
+        $sp['het_hang'] = $sp['so_luong_ton'] <= 0;
+
+        // 1. Đã bán thực tế từ CSDL: tính từ chitietdonhang của các đơn hàng không bị hủy/bom/trả
+        $banRow = $this->selectOne(
+            "SELECT COALESCE(SUM(ct.so_luong), 0) AS da_ban 
+             FROM chitietdonhang ct 
+             JOIN donhang dh ON dh.id = ct.id_donhang 
+             WHERE ct.id_sanpham = ? AND dh.trang_thai NOT IN ('Đã hủy', 'Bom hàng', 'Trả hàng')",
+            [$id]
+        );
+        $daBanTuDon = (int)($banRow['da_ban'] ?? 0);
+        $chenhLech = max(0, $sp['so_luong_goc'] - $sp['so_luong_ton']);
+        $sp['da_ban'] = max($daBanTuDon, $chenhLech);
+
+        // 2. Số sao & tổng số lượt đánh giá thực tế từ bảng danhgia trong CSDL
+        $dgRow = $this->selectOne(
+            "SELECT AVG(so_sao) AS sao_tb, COUNT(id) AS tong_dg 
+             FROM danhgia 
+             WHERE id_sanpham = ? AND trang_thai = 1",
+            [$id]
+        );
+        $tongDg = (int)($dgRow['tong_dg'] ?? 0);
+        $saoTb = $tongDg > 0 ? round((float)$dgRow['sao_tb'], 1) : 5.0;
+        $sp['sao_tb'] = $saoTb;
+        $sp['so_danh_gia'] = $tongDg;
+    }
+
     public function layChiTiet(int $id): ?array
     {
-        return $this->selectOne('SELECT * FROM sanpham WHERE id = ?', [$id]);
+        $sp = $this->selectOne('SELECT * FROM sanpham WHERE id = ?', [$id]);
+        if ($sp !== null) {
+            $this->boSungThongTinReal($sp);
+        }
+        return $sp;
     }
 
     public function layTheoMa(string $maSp): ?array
@@ -94,57 +146,83 @@ class sanpham extends xl_database
         if ($check !== null) {
             return ['ok' => false, 'loi' => $check];
         }
-        $id = $this->insert('sanpham', [
-            'ma_sp' => $ma,
-            'ten_sp' => trim((string) ($data['ten_sp'] ?? '')),
-            'id_danhmuc' => (int) ($data['id_danhmuc'] ?? 0),
-            'gia' => (float) ($data['gia'] ?? 0),
-            'so_luong_goc' => $goc,
-            'so_luong_ton' => $ton,
-            'hinh' => $data['hinh'] ?? null,
-            'mo_ta' => $data['mo_ta'] ?? null,
-            'han_su_dung' => $data['han_su_dung'] ?? null,
-        ]);
+        try {
+            $id = $this->insert('sanpham', [
+                'ma_sp' => $ma,
+                'ten_sp' => trim((string) ($data['ten_sp'] ?? '')),
+                'id_danhmuc' => (int) ($data['id_danhmuc'] ?? 0),
+                'gia' => (float) ($data['gia'] ?? 0),
+                'so_luong_goc' => $goc,
+                'so_luong_ton' => $ton,
+                'hinh' => !empty($data['hinh']) ? $data['hinh'] : null,
+                'mo_ta' => !empty($data['mo_ta']) ? $data['mo_ta'] : null,
+                'han_su_dung' => !empty($data['han_su_dung']) ? $data['han_su_dung'] : null,
+            ]);
+        } catch (PDOException $e) {
+            error_log('Them san pham: ' . $e->getMessage());
+            return ['ok' => false, 'loi' => $e->getCode() === '23000'
+                ? 'Mã sản phẩm đã tồn tại' : 'Không thể lưu sản phẩm lúc này'];
+        }
         return ['ok' => true, 'id' => $id];
     }
 
     public function sua(int $id, array $data): array
     {
-        $sp = $this->layChiTiet($id);
-        if ($sp === null) {
-            return ['ok' => false, 'loi' => 'Khong tim thay san pham'];
-        }
-        $data = array_replace($sp, $data);
-        if ((int) $data['so_luong_goc'] !== (int) $sp['so_luong_goc']) {
-            return ['ok' => false, 'loi' => 'Khong duoc doi so luong tao ban dau'];
-        }
-        $loi = $this->kiemTraDuLieu($data);
-        if ($loi !== null) {
-            return ['ok' => false, 'loi' => $loi];
-        }
-        $goc = array_key_exists('so_luong_goc', $data) ? (int) $data['so_luong_goc'] : (int) $sp['so_luong_goc'];
-        $ton = array_key_exists('so_luong_ton', $data) ? (int) $data['so_luong_ton'] : (int) $sp['so_luong_ton'];
-        $check = $this->kiemTraSoLuong($goc, $ton);
-        if ($check !== null) {
-            return ['ok' => false, 'loi' => $check];
-        }
-        $fields = [
-            'ten_sp' => trim((string) ($data['ten_sp'] ?? $sp['ten_sp'])),
-            'id_danhmuc' => (int) ($data['id_danhmuc'] ?? $sp['id_danhmuc']),
-            'gia' => (float) ($data['gia'] ?? $sp['gia']),
-            'so_luong_goc' => $goc,
-            'so_luong_ton' => $ton,
-            'hinh' => $data['hinh'] ?? $sp['hinh'],
-            'mo_ta' => $data['mo_ta'] ?? $sp['mo_ta'],
-            'han_su_dung' => $data['han_su_dung'] ?? $sp['han_su_dung'],
-        ];
-        if (!empty($data['ma_sp']) && $data['ma_sp'] !== $sp['ma_sp']) {
-            if ($this->layTheoMa((string) $data['ma_sp']) !== null) {
-                return ['ok' => false, 'loi' => 'Ma san pham da ton tai'];
+        try {
+            $this->begin();
+            $sp = $this->selectOne('SELECT * FROM sanpham WHERE id = ? FOR UPDATE', [$id]);
+            if ($sp === null) {
+                $this->rollback();
+                return ['ok' => false, 'loi' => 'Không tìm thấy sản phẩm'];
             }
-            $fields['ma_sp'] = trim((string) $data['ma_sp']);
+            $data = array_replace($sp, $data);
+            if ((int) $data['so_luong_goc'] !== (int) $sp['so_luong_goc']) {
+                $this->rollback();
+                return ['ok' => false, 'loi' => 'Không được thay đổi số lượng tạo ban đầu'];
+            }
+            $loi = $this->kiemTraDuLieu($data);
+            if ($loi !== null) {
+                $this->rollback();
+                return ['ok' => false, 'loi' => $loi];
+            }
+            $goc = (int) $data['so_luong_goc'];
+            $ton = (int) $data['so_luong_ton'];
+            $check = $this->kiemTraSoLuong($goc, $ton);
+            if ($check !== null) {
+                $this->rollback();
+                return ['ok' => false, 'loi' => $check];
+            }
+            $fields = [
+                'ten_sp' => trim((string) $data['ten_sp']),
+                'id_danhmuc' => (int) $data['id_danhmuc'],
+                'gia' => (float) $data['gia'],
+                'so_luong_goc' => $goc,
+                'so_luong_ton' => $ton,
+                'hinh' => $data['hinh'] ?? null,
+                'mo_ta' => $data['mo_ta'] ?? null,
+                'han_su_dung' => $data['han_su_dung'] ?: null,
+            ];
+            $ma = trim((string) $data['ma_sp']);
+            if ($ma !== $sp['ma_sp']) {
+                $existing = $this->layTheoMa($ma);
+                if ($existing !== null && (int) $existing['id'] !== $id) {
+                    $this->rollback();
+                    return ['ok' => false, 'loi' => 'Mã sản phẩm đã tồn tại'];
+                }
+                $fields['ma_sp'] = $ma;
+            }
+            $this->update('sanpham', $fields, 'id = ?', [$id]);
+            $this->commit();
+        } catch (PDOException $e) {
+            $this->rollback();
+            error_log('Sua san pham: ' . $e->getMessage());
+            return ['ok' => false, 'loi' => $e->getCode() === '23000'
+                ? 'Mã sản phẩm đã tồn tại' : 'Không thể cập nhật sản phẩm lúc này'];
+        } catch (Throwable $e) {
+            $this->rollback();
+            error_log('Sua san pham: ' . $e->getMessage());
+            return ['ok' => false, 'loi' => 'Không thể cập nhật sản phẩm lúc này'];
         }
-        $this->update('sanpham', $fields, 'id = ?', [$id]);
         return ['ok' => true];
     }
 
@@ -171,7 +249,8 @@ class sanpham extends xl_database
             return ['ok' => true];
         } catch (Throwable $e) {
             $this->rollback();
-            throw $e;
+            error_log('Xoa san pham: ' . $e->getMessage());
+            return ['ok' => false, 'loi' => 'Không thể xóa sản phẩm vì dữ liệu đang được sử dụng'];
         }
     }
 
@@ -251,14 +330,16 @@ class sanpham extends xl_database
 
     private function kiemTraDuLieu(array $data): ?string
     {
-        if (trim((string) ($data['ma_sp'] ?? '')) === '' || strlen((string) $data['ma_sp']) > 50) {
-            return 'Ma san pham bat buoc va toi da 50 ky tu';
+        $ma = trim((string) ($data['ma_sp'] ?? ''));
+        $ten = trim((string) ($data['ten_sp'] ?? ''));
+        if ($ma === '' || strlen($ma) > 200) {
+            return 'Mã sản phẩm bắt buộc và tối đa 50 ký tự';
         }
-        if (trim((string) ($data['ten_sp'] ?? '')) === '') {
-            return 'Ten san pham khong duoc rong';
+        if ($ten === '' || strlen($ten) > 1020) {
+            return 'Tên sản phẩm bắt buộc và tối đa 255 ký tự';
         }
         if (!$this->soTienHopLe($data['gia'] ?? null)) {
-            return 'Gia san pham khong hop le';
+            return 'Giá sản phẩm không hợp lệ';
         }
         if (!$this->soNguyenHopLe($data['so_luong_goc'] ?? null)
             || !$this->soNguyenHopLe($data['so_luong_ton'] ?? $data['so_luong_goc'])) {
@@ -270,6 +351,9 @@ class sanpham extends xl_database
         }
         if (!empty($data['han_su_dung']) && !$this->ngayHopLe($data['han_su_dung'])) {
             return 'Han su dung khong hop le';
+        }
+        if (isset($data['hinh']) && $data['hinh'] !== null && strlen((string) $data['hinh']) > 1020) {
+            return 'Đường dẫn ảnh tối đa 255 ký tự';
         }
         return null;
     }

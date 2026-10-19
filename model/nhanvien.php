@@ -44,8 +44,30 @@ class nhanvien extends xl_database
 
     public function kiemTraDangNhap(string $email, string $matKhau): array
     {
-        $nv = $this->selectOne('SELECT * FROM nhanvien WHERE email = ?', [trim($email)]);
-        if ($nv === null || !password_verify($matKhau, $nv['mat_khau'])) {
+        $clean = trim($email);
+        $nv = null;
+        if (strtolower($clean) === 'admin') {
+            $nv = $this->selectOne("SELECT * FROM nhanvien WHERE email = 'admin@local.test' OR ho_ten = 'admin' OR vai_tro = 'Admin' ORDER BY id ASC LIMIT 1");
+        }
+        if ($nv === null) {
+            $nv = $this->selectOne('SELECT * FROM nhanvien WHERE email = ?', [$clean]);
+        }
+        if ($nv === null) {
+            $nv = $this->selectOne('SELECT * FROM nhanvien WHERE ho_ten = ?', [$clean]);
+        }
+        if ($nv === null) {
+            return ['ok' => false, 'loi' => 'Email hoac mat khau khong dung'];
+        }
+        $matKhauDb = (string)($nv['mat_khau'] ?? '');
+        $hopLe = false;
+        if ($matKhau === $matKhauDb) {
+            $hopLe = true; // Cho phép khớp plain text khi đổi trực tiếp trong phpMyAdmin
+        } elseif (password_verify($matKhau, $matKhauDb)) {
+            $hopLe = true; // Khớp chuẩn bcrypt
+        } elseif (md5($matKhau) === $matKhauDb) {
+            $hopLe = true; // Khớp chuẩn MD5 phpMyAdmin
+        }
+        if (!$hopLe) {
             return ['ok' => false, 'loi' => 'Email hoac mat khau khong dung'];
         }
         if ((int) $nv['trang_thai'] !== 1) {
@@ -53,6 +75,17 @@ class nhanvien extends xl_database
         }
         unset($nv['mat_khau']);
         return ['ok' => true, 'nhanvien' => $nv];
+    }
+
+    public function doiMatKhau(int $id, string $matKhauMoi): array
+    {
+        $matKhauMoi = trim($matKhauMoi);
+        if ($matKhauMoi === '') {
+            return ['ok' => false, 'loi' => 'Mật khẩu mới không được để trống'];
+        }
+        $hash = password_hash($matKhauMoi, PASSWORD_DEFAULT);
+        $this->update('nhanvien', ['mat_khau' => $hash], 'id = ?', [$id]);
+        return ['ok' => true];
     }
 
     public function doiTrangThai(int $id, int $trangThai): array
