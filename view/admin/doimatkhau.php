@@ -50,6 +50,7 @@ require_once __DIR__ . '/header_admin.php';
                 </div>
                 <div class="card-body p-4">
                     <form action="<?=$admin_ctrl_url?>&act=doimatkhau" method="POST">
+                        <input type="hidden" name="_csrf" value="<?=$e($csrfToken)?>">
                         <div class="mb-3">
                             <label class="form-label fw-semibold small">Tài khoản Quản Trị Đang Đăng Nhập</label>
                             <input type="text" class="form-control bg-light" value="<?=htmlspecialchars($_SESSION['admin']['ho_ten'] ?? $_SESSION['admin']['email'] ?? 'admin')?> (<?=htmlspecialchars($_SESSION['admin']['email'] ?? 'admin@local.test')?>)" readonly>
@@ -59,12 +60,12 @@ require_once __DIR__ . '/header_admin.php';
                             <label class="form-label fw-semibold small">Mật khẩu mới <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light"><i class="fas fa-key text-muted"></i></span>
-                                <input type="password" name="mat_khau_moi" id="matKhauMoi" class="form-control" placeholder="Nhập mật khẩu mới mong muốn (ví dụ: 123 hoặc mật khẩu bất kỳ)" required>
+                                <input type="password" name="mat_khau_moi" id="matKhauMoi" class="form-control" minlength="12" autocomplete="new-password" placeholder="Ít nhất 12 ký tự" required>
                                 <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('matKhauMoi')">
                                     <i class="fas fa-eye"></i>
                                 </button>
                             </div>
-                            <div class="form-text small text-muted">Hệ thống cho phép bạn đặt mật khẩu tùy ý (ví dụ: 123) và lưu chuẩn vào CSDL.</div>
+                            <div class="form-text small text-muted">Dùng mật khẩu duy nhất, tối thiểu 12 ký tự.</div>
                         </div>
 
                         <div class="mb-4">
@@ -111,8 +112,8 @@ require_once __DIR__ . '/header_admin.php';
                         <ul class="small text-muted mb-0 ps-3">
                             <li>Cột <code>ho_ten</code>: <strong>admin</strong></li>
                             <li>Cột <code>email</code>: <strong>admin@local.test</strong></li>
-                            <li>Cột <code>vai_tro</code>: <strong>Admin</strong></li>
-                            <li>Cột <code>mat_khau</code>: Lưu mật khẩu (hỗ trợ hash bcrypt, MD5 hoặc chuỗi text thường nếu chỉnh tay trong phpMyAdmin)</li>
+                            <li>Cột <code>vai_tro</code>: <strong>SuperAdmin</strong> (tài khoản cũ có thể là <code>Admin</code>)</li>
+                            <li>Cột <code>mat_khau</code>: Chỉ lưu hash tạo bởi <code>password_hash()</code>; không nhập mật khẩu dạng chữ thường trong phpMyAdmin.</li>
                         </ul>
                     </div>
 
@@ -129,7 +130,7 @@ require_once __DIR__ . '/header_admin.php';
                     </div>
 
                     <div class="alert alert-info rounded-3 small p-3 mb-0">
-                        <i class="fas fa-info-circle me-1"></i> <strong>Lưu ý:</strong> Khi bạn sửa mật khẩu trực tiếp trong phpMyAdmin (ví dụ gõ chữ thường <code>123</code> vào cột <code>mat_khau</code>), hệ thống vẫn tự động nhận diện và cho phép đăng nhập bình thường!
+                        <i class="fas fa-info-circle me-1"></i> <strong>Lưu ý:</strong> Đổi mật khẩu tại biểu mẫu này để hệ thống tạo hash an toàn; không sửa trực tiếp cột mật khẩu trong phpMyAdmin.
                     </div>
                 </div>
             </div>
@@ -145,4 +146,3 @@ function togglePassword(id) {
     }
 }
 </script>
-

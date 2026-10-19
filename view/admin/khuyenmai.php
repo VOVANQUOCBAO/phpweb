@@ -9,6 +9,7 @@ $admin_url = 'index.php?khu=admin';
     <section class="card mb-4"><div class="card-header fw-bold">Tạo khuyến mãi</div><div class="card-body">
         <?php if ($ds_sanpham === [] && $ds_danhmuc === []): ?><p class="text-muted">Thêm sản phẩm và danh mục trước khi tạo khuyến mãi.</p><?php else: ?>
         <form action="<?=$admin_url?>&amp;act=themkhuyenmai" method="post" class="row g-3">
+            <input type="hidden" name="_csrf" value="<?=$e($csrfToken)?>">
             <div class="col-md-4"><label class="form-label">Tên chương trình</label><input class="form-control" name="ten_km" required></div>
             <div class="col-md-2"><label class="form-label">Áp dụng cho</label><select class="form-select" name="loai"><option value="sanpham">Sản phẩm</option><option value="danhmuc">Danh mục</option></select></div>
             <div class="col-md-3"><label class="form-label">Sản phẩm</label><select class="form-select" name="id_sanpham"><?php foreach ($ds_sanpham as $sp): ?><option value="<?=$e($sp['id'])?>"><?=$e($sp['ma_sp'])?> — <?=$e($sp['ten_sp'])?></option><?php endforeach; ?></select></div>

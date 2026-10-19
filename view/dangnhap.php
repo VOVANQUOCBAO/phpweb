@@ -38,17 +38,20 @@
                         </div>
                     <?php endif; ?>
 
-                    <!-- Nút Đăng nhập nhanh bằng Google như các trang web lớn -->
+                    <!-- Google Identity Services posts a signed ID token to the server. -->
                     <div class="mb-4">
-                        <button type="button" class="btn btn-outline-dark w-100 rounded-pill py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 shadow-sm" onclick="showGoogleLoginModal()">
-                            <svg width="20" height="20" viewBox="0 0 48 48">
-                                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                            </svg>
-                            Tiếp tục với Google (Gmail)
-                        </button>
+                        <?php if (!empty($googleClientId)): ?>
+                            <div id="g_id_onload"
+                                 data-client_id="<?=htmlspecialchars($googleClientId, ENT_QUOTES, 'UTF-8')?>"
+                                 data-context="signin"
+                                 data-ux_mode="redirect"
+                                 data-login_uri="<?=htmlspecialchars($googleLoginUri, ENT_QUOTES, 'UTF-8')?>"
+                                 data-auto_prompt="false"></div>
+                            <div class="g_id_signin" data-type="standard" data-shape="pill" data-theme="outline" data-text="continue_with" data-size="large" data-width="320"></div>
+                            <script src="https://accounts.google.com/gsi/client" async defer></script>
+                        <?php else: ?>
+                            <div class="alert alert-secondary small mb-0">Đăng nhập Google chưa được cấu hình trên máy chủ.</div>
+                        <?php endif; ?>
                         <div class="position-relative text-center my-3">
                             <hr class="text-muted">
                             <span class="position-absolute top-50 start-50 translate-middle bg-white px-3 small text-muted">hoặc đăng nhập bằng tài khoản</span>
@@ -100,47 +103,3 @@
         </div>
     </div>
 </div>
-
-<!-- Modal Đăng nhập / Đăng ký Google nhanh -->
-<div class="modal fade" id="googleLoginModal" tabindex="-1" aria-labelledby="googleModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content rounded-4 border-0 shadow">
-            <div class="modal-header border-bottom-0 pb-0">
-                <h5 class="modal-title fw-bold" id="googleModalLabel">
-                    <img src="https://www.gstatic.com/images/branding/googlelogo/svg/googlelogo_clr_74x24px.svg" height="24" alt="Google" class="me-2"> 
-                    Đăng nhập bằng tài khoản Google
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-4">
-                <p class="text-muted small">Nhập địa chỉ Gmail của bạn để đăng nhập hoặc tự động tạo tài khoản mới ngay lập tức:</p>
-                <form action="index.php?act=google_login" method="POST">
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold">Địa chỉ Gmail</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light"><i class="fab fa-google text-danger"></i></span>
-                            <input type="email" name="google_email" class="form-control" placeholder="ten_cua_ban@gmail.com" required>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold">Họ và tên của bạn</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light"><i class="fas fa-user text-muted"></i></span>
-                            <input type="text" name="google_name" class="form-control" placeholder="Nguyễn Văn A" required>
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-danger w-100 rounded-pill py-2 fw-bold">
-                        <i class="fab fa-google me-1"></i> Xác Nhận Đăng Nhập Với Gmail
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-function showGoogleLoginModal() {
-    var myModal = new bootstrap.Modal(document.getElementById('googleLoginModal'));
-    myModal.show();
-}
-</script>

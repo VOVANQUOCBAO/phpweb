@@ -4,6 +4,15 @@ class controller
 {
     public function render(string $view, array $data = []): void
     {
+        if (str_starts_with(ltrim($view, '/'), 'admin/')) {
+            $data['csrfToken'] = $this->csrfToken();
+            $role = (string) ($_SESSION['admin']['vai_tro'] ?? '');
+            $data['adminRole'] = $role;
+            $data['isSuperAdmin'] = in_array($role, ['Admin', 'SuperAdmin'], true);
+            $data['isManager'] = $role === 'QuanLy';
+            $data['isEmployee'] = $role === 'NhanVien';
+        }
+
         // 1. Kiểm tra nếu là request kiểm thử / API JSON
         $isJson = (
             (isset($_GET['format']) && $_GET['format'] === 'json') ||
@@ -14,13 +23,19 @@ class controller
         );
 
         if ($isJson) {
-            $this->json($data);
+            $status = http_response_code();
+            $this->json($data, $status >= 100 ? $status : 200);
             return;
         }
 
         // 2. Render HTML cho trình duyệt (Web Browser)
         $path = BASE_PATH . '/view/' . ltrim($view, '/');
         if (is_file($path)) {
+            $e = static fn(mixed $value): string => htmlspecialchars(
+                (string) ($value ?? ''),
+                ENT_QUOTES | ENT_SUBSTITUTE,
+                'UTF-8'
+            );
             extract($data, EXTR_SKIP);
 
             // View Admin tự nhúng header_admin.php
@@ -103,11 +118,52 @@ class controller
     public function requireAdmin(): ?array
     {
         if (empty($_SESSION['admin']['id'])) {
+            unset($_SESSION['admin']);
             return null;
         }
-        if (!isset($_SESSION['admin']['hoten']) && isset($_SESSION['admin']['ho_ten'])) {
-            $_SESSION['admin']['hoten'] = $_SESSION['admin']['ho_ten'];
+
+        require_once BASE_PATH . '/model/nhanvien.php';
+        $admin = (new nhanvien())->layTheoId((int) $_SESSION['admin']['id']);
+        if ($admin === null
+            || (int) $admin['trang_thai'] !== 1
+            || !in_array($admin['vai_tro'], ['Admin', 'SuperAdmin', 'QuanLy', 'NhanVien'], true)) {
+            unset($_SESSION['admin'], $_SESSION['admin_csrf']);
+            return null;
         }
+
+        $admin['hoten'] = $admin['ho_ten'];
+        $_SESSION['admin'] = $admin;
         return $_SESSION['admin'];
+    }
+
+    public function canAccessAdminAction(string $action, string $role): bool
+    {
+        if (in_array($role, ['Admin', 'SuperAdmin'], true)) {
+            return true;
+        }
+
+        $allowedActions = match ($role) {
+            'QuanLy' => ['sanpham', 'donhang', 'chitietdonhang', 'khachhang', 'giaodien', 'doimatkhau'],
+            'NhanVien' => ['sanpham', 'doimatkhau'],
+            default => [],
+        };
+
+        return in_array($action, $allowedActions, true);
+    }
+
+    public function csrfToken(): string
+    {
+        if (!isset($_SESSION['admin_csrf']) || !is_string($_SESSION['admin_csrf'])) {
+            $_SESSION['admin_csrf'] = bin2hex(random_bytes(32));
+        }
+        return $_SESSION['admin_csrf'];
+    }
+
+    public function verifyCsrfToken(mixed $token): bool
+    {
+        return is_string($token)
+            && isset($_SESSION['admin_csrf'])
+            && is_string($_SESSION['admin_csrf'])
+            && hash_equals($_SESSION['admin_csrf'], $token);
     }
 }

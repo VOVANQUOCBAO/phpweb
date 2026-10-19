@@ -8,6 +8,7 @@ $admin_url = 'index.php?khu=admin';
     <?php if ($thongBao !== null): ?><div class="alert alert-success"><?=$e($thongBao)?></div><?php endif; ?>
     <section class="card mb-4"><div class="card-header fw-bold">Tạo voucher</div><div class="card-body">
         <form action="<?=$admin_url?>&amp;act=themvoucher" method="post" class="row g-3">
+            <input type="hidden" name="_csrf" value="<?=$e($csrfToken)?>">
             <div class="col-md-3"><label class="form-label">Mã</label><input class="form-control" name="ma_code" maxlength="50" required></div>
             <div class="col-md-2"><label class="form-label">Loại</label><select class="form-select" name="loai"><option value="tien">Giảm tiền</option><option value="phantram">Phần trăm</option><option value="mienship">Miễn ship</option></select></div>
             <div class="col-md-2"><label class="form-label">Giá trị</label><input class="form-control" type="number" min="0" step="0.01" name="gia_tri" value="0" required></div>
@@ -23,7 +24,7 @@ $admin_url = 'index.php?khu=admin';
             <tbody><?php foreach ($ds_voucher as $vc): ?><tr>
                 <td><?=$e($vc['ma_code'])?></td><td><?=$e($vc['loai'])?></td><td><?=$e($vc['gia_tri'])?></td><td><?=$e($vc['so_luong'])?></td>
                 <td><?=$e($vc['ngay_bd'])?> – <?=$e($vc['ngay_kt'])?></td><td><?=$e($vc['hang_ap_dung'] ?? 'Mọi hạng')?></td>
-                <td><form action="<?=$admin_url?>&amp;act=xoavoucher" method="post" onsubmit="return confirm('Xóa voucher này?')"><input type="hidden" name="id" value="<?=$e($vc['id'])?>"><button class="btn btn-sm btn-outline-danger">Xóa</button></form></td>
+                <td><form action="<?=$admin_url?>&amp;act=xoavoucher" method="post" onsubmit="return confirm('Xóa voucher này?')"><input type="hidden" name="_csrf" value="<?=$e($csrfToken)?>"><input type="hidden" name="id" value="<?=$e($vc['id'])?>"><button class="btn btn-sm btn-outline-danger">Xóa</button></form></td>
             </tr><?php endforeach; ?></tbody>
         </table></div>
         <?php if ($ds_voucher === []): ?><p class="text-muted p-3 mb-0">Chưa có voucher.</p><?php endif; ?>

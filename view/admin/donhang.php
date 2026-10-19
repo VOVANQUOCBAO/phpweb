@@ -9,7 +9,7 @@ $nextStates = [
 ];
 ?>
 <div class="container-fluid">
-    <h3 class="mb-4">Quản lý đơn hàng</h3>
+    <h3 class="mb-4"><?=$isSuperAdmin ? 'Quản lý đơn hàng' : 'Xem đơn hàng'?></h3>
     <?php if ($loi !== null): ?><div class="alert alert-danger"><?=$e($loi)?></div><?php endif; ?>
     <?php if ($thongBao !== null): ?><div class="alert alert-success"><?=$e($thongBao)?></div><?php endif; ?>
     <?php if (isset($chitiet) && $chitiet !== null): ?>
@@ -32,14 +32,15 @@ $nextStates = [
                 <td><?=$e($dh['ho_ten'])?><br><small><?=$e($dh['email'])?></small></td>
                 <td><?=$e($dh['sdt'])?><br><?=$e($dh['dia_chi'])?></td>
                 <td><?=number_format((float)$dh['tong_tien'], 0, ',', '.')?>đ</td><td><?=$e($dh['trang_thai'])?></td>
-                <td><?php $options = $nextStates[$dh['trang_thai']] ?? []; if ($options !== []): ?>
+                <td><?php if ($isSuperAdmin): $options = $nextStates[$dh['trang_thai']] ?? []; if ($options !== []): ?>
                     <form action="<?=$admin_url?>&amp;act=capnhattrangthai" method="post" class="d-flex flex-wrap gap-1">
+                        <input type="hidden" name="_csrf" value="<?=$e($csrfToken)?>">
                         <input type="hidden" name="id" value="<?=$e($dh['id'])?>">
                         <select class="form-select form-select-sm" name="trang_thai"><?php foreach ($options as $state): ?><option value="<?=$e($state)?>"><?=$e($state)?></option><?php endforeach; ?></select>
                         <input class="form-control form-control-sm" name="ly_do" placeholder="Lý do (nếu hủy/bom/trả)">
                         <button class="btn btn-sm btn-primary">Cập nhật</button>
                     </form><?php else: ?><span class="text-muted">Đã kết thúc</span><?php endif; ?>
-                </td>
+                <?php else: ?><span class="text-muted">Chỉ xem</span><?php endif; ?></td>
             </tr><?php endforeach; ?></tbody>
         </table></div>
         <?php if ($ds_donhang === []): ?><p class="text-muted p-3 mb-0">Chưa có đơn hàng.</p><?php endif; ?>

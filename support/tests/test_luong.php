@@ -121,6 +121,10 @@ function race(string $action, array $args): array
 
 function request(string $base, string &$cookie, string $act = '', ?array $post = null, string $path = '/controller/index.php'): array
 {
+    if ($post !== null && str_contains($path, 'khu=admin') && !array_key_exists('_csrf', $post)) {
+        $tokenPage = request($base, $cookie, '', null, '/controller/index.php?khu=admin&act=dangnhap');
+        $post['_csrf'] = (string) ($tokenPage['data']['csrfToken'] ?? '');
+    }
     $separator = str_contains($path, '?') ? '&' : '?';
     $url = $base . $path . ($act !== '' ? $separator . 'act=' . $act : '');
     $headers = 'Cookie: ' . $cookie . "\r\n";
@@ -216,7 +220,9 @@ try {
     $pdo->exec(file_get_contents(BASE_PATH . '/database/schema.sql'));
     check('CSDL rieng + import SQL lap lai giu tai khoan quan tri', counts($pdo, $testDb)['nhanvien'] === 1
         && $adminPassword !== ''
-        && (new nhanvien())->kiemTraDangNhap('admin@local.test', $adminPassword)['ok']);
+        && (new nhanvien())->kiemTraDangNhap('admin@local.test', $adminPassword)['ok']
+        && ((new nhanvien())->selectOne("SELECT vai_tro FROM nhanvien WHERE email = 'admin@local.test'")['vai_tro'] ?? '')
+            === nhanvien::ROLE_SUPER_ADMIN);
 
     $dm = new danhmuc();
     $sp = new sanpham();
@@ -242,6 +248,17 @@ try {
     $kh->moKhoa($idKh);
     check('Dang nhap dung / sai mat khau', $kh->kiemTraDangNhap('model@test.local', '123456')['ok']
         && !$kh->kiemTraDangNhap('model@test.local', 'sai')['ok']);
+    $legacyCustomerId = khTest('legacy-plain@test.local');
+    $kh->update('khachhang', ['mat_khau' => 'LegacyPlainPass'], 'id = ?', [$legacyCustomerId]);
+    $legacyCustomerLogin = $kh->kiemTraDangNhap('legacy-plain@test.local', 'LegacyPlainPass');
+    check('Dang nhap tai khoan cu tu dong nang cap mat khau ro sang hash', !empty($legacyCustomerLogin['ok'])
+        && password_verify('LegacyPlainPass', $kh->layTheoId($legacyCustomerId)['mat_khau'])
+        && $kh->layTheoId($legacyCustomerId)['mat_khau'] !== 'LegacyPlainPass');
+    $legacyMd5CustomerId = khTest('legacy-md5@test.local');
+    $kh->update('khachhang', ['mat_khau' => md5('LegacyMd5Pass')], 'id = ?', [$legacyMd5CustomerId]);
+    $legacyMd5Login = $kh->kiemTraDangNhap('legacy-md5@test.local', 'LegacyMd5Pass');
+    check('Dang nhap tai khoan cu MD5 tu dong nang cap sang hash', !empty($legacyMd5Login['ok'])
+        && password_verify('LegacyMd5Pass', $kh->layTheoId($legacyMd5CustomerId)['mat_khau']));
     check('Chan gia am, ton am, ton vuot goc va so luong le',
         !$sp->sua($idSp, ['gia' => -1])['ok'] && !$sp->sua($idSp, ['so_luong_ton' => -1])['ok']
         && !$sp->sua($idSp, ['so_luong_ton' => 11])['ok'] && !$sp->sua($idSp, ['so_luong_ton' => '1.5'])['ok']);
@@ -352,9 +369,39 @@ try {
     check('Chua cau hinh SMTP: van luu hop thu va tra trang thai ro rang', $mail['ok'] && !$mail['smtp']['ok']
         && count((new email())->layThuCuaKhach($idKh)) === 1);
     $nv = new nhanvien();
-    $nvR = $nv->them(['ho_ten' => 'Nhan vien', 'email' => 'nv@test.local', 'mat_khau' => '123456']);
+    $nvR = $nv->them(['ho_ten' => 'Nhan vien', 'email' => 'nv@test.local', 'mat_khau' => 'TestPassword123']);
     $nv->doiTrangThai($nvR['id'], 0);
-    check('Model nhan vien bi khoa khong dang nhap duoc', !$nv->kiemTraDangNhap('nv@test.local', '123456')['ok']);
+    check('Model nhan vien bi khoa khong dang nhap duoc', !$nv->kiemTraDangNhap('nv@test.local', 'TestPassword123')['ok']);
+    $legacyEmployee = $nv->them([
+        'ho_ten' => 'Legacy Employee', 'email' => 'legacy-employee@test.local', 'mat_khau' => 'LegacyEmployee123',
+    ]);
+    $nv->update('nhanvien', ['mat_khau' => 'LegacyEmployee123'], 'id = ?', [$legacyEmployee['id']]);
+    $legacyEmployeeLogin = $nv->kiemTraDangNhap('legacy-employee@test.local', 'LegacyEmployee123');
+    check('Dang nhap nhan vien co mat khau cu tu dong nang cap sang hash', !empty($legacyEmployeeLogin['ok'])
+        && password_verify('LegacyEmployee123', $nv->selectOne(
+            'SELECT mat_khau FROM nhanvien WHERE id = ?',
+            [$legacyEmployee['id']]
+        )['mat_khau']));
+    check('Doi mat khau Admin tu choi mat khau ngan', !$nv->doiMatKhau($legacyEmployee['id'], 'short')['ok']);
+
+    $googleNew = $kh->dangNhapGoogle('google-sub-new', 'google-new@test.local', 'Google New');
+    $googleAgain = $kh->dangNhapGoogle('google-sub-new', 'google-new@test.local', 'Google New');
+    check('Google tao tai khoan moi va nhan dien lai theo sub', !empty($googleNew['ok'])
+        && !empty($googleNew['created']) && !isset($googleNew['khachhang']['mat_khau'])
+        && !empty($googleAgain['ok']) && empty($googleAgain['created'])
+        && (int) $googleNew['khachhang']['id'] === (int) $googleAgain['khachhang']['id']);
+    $googleExistingId = khTest('google-link@test.local');
+    $googleLink = $kh->dangNhapGoogle('google-sub-link', 'google-link@test.local', 'Linked');
+    $googleCollision = $kh->dangNhapGoogle('google-sub-other', 'google-link@test.local', 'Other');
+    check('Google lien ket email co san va tu choi xung dot sub', !empty($googleLink['ok'])
+        && (int) $googleLink['khachhang']['id'] === $googleExistingId && empty($googleCollision['ok']));
+    $googleLockedId = khTest('google-locked@test.local');
+    $kh->khoa($googleLockedId);
+    check('Google tu choi tai khoan da bi khoa', empty($kh->dangNhapGoogle(
+        'google-sub-locked',
+        'google-locked@test.local',
+        'Locked'
+    )['ok']));
 
     $idRace = spTest($idDm, 'LAST', 1);
     $race = race('checkout', [['kh' => $idKh, 'sp' => $idRace], ['kh' => $idKh2, 'sp' => $idRace]]);
@@ -401,10 +448,159 @@ try {
     $base = 'http://' . $addr;
     $adminCookie = '';
     $adminPath = '/controller/index.php?khu=admin';
+    $anonymousCookie = '';
+    $r = request($base, $anonymousCookie, 'csdl', null, $adminPath);
+    check('HTTP du lieu CSDL chi cho phep admin da dang nhap', $r['status'] === 302
+        && str_contains($r['location'], 'dangnhap'));
+    $r = request($base, $anonymousCookie, 'themnhanvien', [
+        'ho_ten' => 'Unauthorized', 'email' => 'unauthorized@test.local', 'mat_khau' => 'TestPassword123',
+    ], $adminPath);
+    check('HTTP khach vang lai khong tao duoc nhan vien', $r['status'] === 302
+        && $nv->kiemTraDangNhap('unauthorized@test.local', 'TestPassword123')['ok'] === false);
+    $r = request($base, $adminCookie, 'dangnhap', [
+        '_csrf' => '', 'admin_user' => 'admin@local.test', 'admin_pass' => $adminPassword,
+    ], $adminPath);
+    check('HTTP dang nhap Admin tu choi request thieu CSRF token', $r['status'] === 403);
     $r = request($base, $adminCookie, 'dangnhap', [
         'admin_user' => 'admin@local.test', 'admin_pass' => $adminPassword,
     ], $adminPath);
     check('HTTP dang nhap Admin khong can thong tin dien san', $r['status'] === 302 && $adminCookie !== '');
+    $adminId = (int) $nv->selectOne("SELECT id FROM nhanvien WHERE email = 'admin@local.test'")['id'];
+    $adminRole = (string) $nv->layTheoId($adminId)['vai_tro'];
+    $nv->update('nhanvien', ['vai_tro' => 'NhanVien'], 'id = ?', [$adminId]);
+    $r = request($base, $adminCookie, 'csdl', null, $adminPath);
+    check('HTTP Admin bi thu hoi quyen sau khi vai tro thay doi trong CSDL',
+        $r['status'] === 403);
+    $nv->update('nhanvien', ['vai_tro' => $adminRole], 'id = ?', [$adminId]);
+    $r = request($base, $adminCookie, 'dangnhap', [
+        'admin_user' => 'admin@local.test', 'admin_pass' => $adminPassword,
+    ], $adminPath);
+    check('HTTP Admin dang nhap lai sau khi quyen duoc khoi phuc', $r['status'] === 302);
+    $nv->update('nhanvien', ['trang_thai' => 0], 'id = ?', [$adminId]);
+    $r = request($base, $adminCookie, 'csdl', null, $adminPath);
+    check('HTTP Admin bi thu hoi phien ngay sau khi tai khoan bi khoa',
+        $r['status'] === 302 && str_contains($r['location'], 'dangnhap'));
+    $nv->update('nhanvien', ['trang_thai' => 1], 'id = ?', [$adminId]);
+    $r = request($base, $adminCookie, 'dangnhap', [
+        'admin_user' => 'admin@local.test', 'admin_pass' => $adminPassword,
+    ], $adminPath);
+    check('HTTP Admin dang nhap lai sau khi tai khoan duoc mo khoa', $r['status'] === 302);
+    $r = request($base, $adminCookie, 'themnhanvien', [
+        '_csrf' => '', 'ho_ten' => 'No CSRF', 'email' => 'no-csrf@test.local',
+        'mat_khau' => 'NoCsrfPassword123',
+    ], $adminPath);
+    check('HTTP tu choi POST admin thieu CSRF token', $r['status'] === 403
+        && $nv->kiemTraDangNhap('no-csrf@test.local', 'NoCsrfPassword123')['ok'] === false);
+    $r = request($base, $adminCookie, 'themnhanvien', [
+        'ho_ten' => 'HTTP Employee', 'email' => 'employee-http@test.local', 'mat_khau' => 'EmployeePass123',
+    ], $adminPath);
+    $employee = $nv->kiemTraDangNhap('employee-http@test.local', 'EmployeePass123');
+    check('HTTP Admin tao nhan vien thuong, khong tao them Admin', $r['status'] === 200
+        && !empty($employee['ok']) && ($employee['nhanvien']['vai_tro'] ?? '') === 'NhanVien');
+    $employeeCookie = '';
+    $r = request($base, $employeeCookie, 'dangnhap', [
+        'admin_user' => 'employee-http@test.local', 'admin_pass' => 'EmployeePass123',
+    ], $adminPath);
+    $employeeAccess = request($base, $employeeCookie, 'csdl', null, $adminPath);
+    check('HTTP nhan vien dang nhap duoc nhung khong vao duoc muc CSDL',
+        $r['status'] === 302 && $employeeAccess['status'] === 403);
+    $employeeProducts = requestHtml($base, $employeeCookie, '/controller/index.php?khu=admin&act=sanpham');
+    $employeeTheme = request($base, $employeeCookie, 'giaodien', null, $adminPath);
+    $employeeOrders = request($base, $employeeCookie, 'donhang', null, $adminPath);
+    check('HTTP nhan vien chi xem san pham, khong sua san pham hay vao nghiep vu khac',
+        $employeeProducts['status'] === 200 && str_contains($employeeProducts['body'], 'Danh sách sản phẩm')
+        && !str_contains($employeeProducts['body'], 'id="spForm"')
+        && $employeeTheme['status'] === 403 && $employeeOrders['status'] === 403);
+
+    $managerCreate = request($base, $adminCookie, 'themnhanvien', [
+        'ho_ten' => 'HTTP Manager',
+        'email' => 'manager-http@test.local',
+        'mat_khau' => 'ManagerPassword123',
+        'vai_tro' => nhanvien::ROLE_MANAGER,
+    ], $adminPath);
+    $manager = $nv->kiemTraDangNhap('manager-http@test.local', 'ManagerPassword123');
+    $managerCookie = '';
+    $managerLogin = request($base, $managerCookie, 'dangnhap', [
+        'admin_user' => 'manager-http@test.local', 'admin_pass' => 'ManagerPassword123',
+    ], $adminPath);
+    $managerProducts = requestHtml($base, $managerCookie, '/controller/index.php?khu=admin&act=sanpham');
+    $managerOrders = requestHtml($base, $managerCookie, '/controller/index.php?khu=admin&act=donhang');
+    $managerCustomers = requestHtml($base, $managerCookie, '/controller/index.php?khu=admin&act=khachhang');
+    $managerTheme = request($base, $managerCookie, 'giaodien', null, $adminPath);
+    $managerStaff = request($base, $managerCookie, 'nhanvien', null, $adminPath);
+    $managerDatabase = request($base, $managerCookie, 'csdl', null, $adminPath);
+    check('HTTP Super Admin tao va dang nhap tai khoan QuanLy',
+        $managerCreate['status'] === 200 && !empty($manager['ok'])
+        && ($manager['nhanvien']['vai_tro'] ?? '') === nhanvien::ROLE_MANAGER
+        && $managerLogin['status'] === 302);
+    check('HTTP QuanLy chi xem san pham/don/khach, duoc doi giao dien va khong sua du lieu',
+        $managerProducts['status'] === 200 && str_contains($managerProducts['body'], 'Danh sách sản phẩm')
+        && !str_contains($managerProducts['body'], 'id="spForm"')
+        && $managerOrders['status'] === 200 && !str_contains($managerOrders['body'], 'act=capnhattrangthai')
+        && $managerCustomers['status'] === 200 && !str_contains($managerCustomers['body'], 'act=khoakhachhang')
+        && $managerTheme['status'] === 200
+        && $managerStaff['status'] === 403 && $managerDatabase['status'] === 403);
+    $managerAttemptStaff = request($base, $managerCookie, 'themnhanvien', [
+        'ho_ten' => 'Escalation Attempt', 'email' => 'escalation@test.local',
+        'mat_khau' => 'EscalationPass123', 'vai_tro' => nhanvien::ROLE_SUPER_ADMIN,
+    ], $adminPath);
+    check('HTTP QuanLy khong the tao tai khoan hay tu nang cap len Super Admin',
+        $managerAttemptStaff['status'] === 403
+        && !$nv->kiemTraDangNhap('escalation@test.local', 'EscalationPass123')['ok']);
+
+    $themeFile = BASE_PATH . '/support/config/theme.json';
+    $themePreviouslyExisted = is_file($themeFile);
+    $oldThemeContents = $themePreviouslyExisted ? file_get_contents($themeFile) : false;
+    $managerThemeSave = request($base, $managerCookie, 'giaodien', [
+        'season' => 'theme-summer', 'font' => 'font-segoe', 'bg' => 'bg-light-gray',
+    ], $adminPath);
+    $themeSavedForTest = is_file($themeFile)
+        ? json_decode((string) file_get_contents($themeFile), true)
+        : null;
+    if ($themePreviouslyExisted) {
+        if (!is_string($oldThemeContents) || file_put_contents($themeFile, $oldThemeContents) === false) {
+            throw new RuntimeException('Khong the khoi phuc cau hinh giao dien sau test');
+        }
+    } elseif (is_file($themeFile) && !unlink($themeFile)) {
+        throw new RuntimeException('Khong the don cau hinh giao dien test');
+    }
+    check('HTTP QuanLy doi duoc giao dien theo mua', $managerThemeSave['status'] === 200
+        && is_array($themeSavedForTest) && ($themeSavedForTest['season'] ?? '') === 'theme-summer');
+    $employeeId = (int) ($employee['nhanvien']['id'] ?? 0);
+    $assignManager = request($base, $adminCookie, 'doivaitronhanvien', [
+        'id' => $employeeId, 'vai_tro' => nhanvien::ROLE_MANAGER,
+    ], $adminPath);
+    $assignedEmployee = $nv->layTheoId($employeeId);
+    check('HTTP Super Admin gan va doi duoc vai tro nhan vien',
+        $assignManager['status'] === 200 && ($assignedEmployee['vai_tro'] ?? '') === nhanvien::ROLE_MANAGER);
+    $lastSuperAdminDemotion = $nv->doiVaiTro($adminId, nhanvien::ROLE_MANAGER, $employeeId);
+    check('CSDL khong cho ha cap Super Admin cuoi cung',
+        empty($lastSuperAdminDemotion['ok'])
+        && ($nv->layTheoId($adminId)['vai_tro'] ?? '') === $adminRole);
+    $reassignEmployee = request($base, $adminCookie, 'doivaitronhanvien', [
+        'id' => $employeeId, 'vai_tro' => nhanvien::ROLE_EMPLOYEE,
+    ], $adminPath);
+    check('HTTP Super Admin doi lai vai tro NhanVien duoc tao', $reassignEmployee['status'] === 200
+        && ($nv->layTheoId($employeeId)['vai_tro'] ?? '') === nhanvien::ROLE_EMPLOYEE);
+    $r = request($base, $adminCookie, 'khoanhanvien&id=' . $employeeId, null, $adminPath);
+    check('HTTP doi trang thai nhan vien tu choi GET', $r['status'] === 405
+        && (int) $nv->layTheoId($employeeId)['trang_thai'] === 1);
+    $r = request($base, $adminCookie, 'khoanhanvien', ['id' => $employeeId, 'trang_thai' => 0], $adminPath);
+    check('HTTP Admin khoa nhan vien bang POST va DB cap nhat', $r['status'] === 200
+        && (int) $nv->layTheoId($employeeId)['trang_thai'] === 0);
+    $r = request($base, $adminCookie, 'khoanhanvien', ['id' => $employeeId, 'trang_thai' => 1], $adminPath);
+    check('HTTP Admin mo khoa nhan vien bang POST va DB cap nhat', $r['status'] === 200
+        && (int) $nv->layTheoId($employeeId)['trang_thai'] === 1);
+    $databaseHtml = requestHtml($base, $adminCookie, '/controller/index.php?khu=admin&act=csdl&bang=khachhang');
+    check('HTTP admin xem duoc bang khach hang nhung khong lo cot mat khau', $databaseHtml['status'] === 200
+        && str_contains($databaseHtml['body'], 'Dữ liệu CSDL trực tiếp')
+        && str_contains($databaseHtml['body'], 'model@test.local')
+        && !str_contains($databaseHtml['body'], '>mat_khau<'));
+    $revenueHtml = requestHtml($base, $adminCookie, '/controller/index.php?khu=admin&act=doanhthu');
+    $voucherHtml = requestHtml($base, $adminCookie, '/controller/index.php?khu=admin&act=voucher');
+    check('HTTP cac trang admin co du lieu render khong bi loi escape', $revenueHtml['status'] === 200
+        && str_contains($revenueHtml['body'], 'Thống kê doanh thu')
+        && $voucherHtml['status'] === 200 && str_contains($voucherHtml['body'], 'Quản lý voucher'));
     $r = request($base, $adminCookie, 'sanpham', null, $adminPath);
     $_SESSION['admin'] = ['hoten' => 'Admin test'];
     $adminHtml = is_array($r['data']) ? renderAdminView($r['data']) : '';
@@ -417,6 +613,10 @@ try {
     $adminSp = $sp->layTheoMa('ADMIN-HTTP');
     check('HTTP Admin them san pham ghi dung du lieu CSDL', $r['status'] === 200
         && $adminSp !== null && (int) $adminSp['so_luong_goc'] === 10 && (int) $adminSp['so_luong_ton'] === 4);
+    $databaseHtml = requestHtml($base, $adminCookie, '/controller/index.php?khu=admin&act=csdl&bang=sanpham');
+    check('HTTP du lieu CSDL cap nhat sau thao tac them san pham cua admin', $databaseHtml['status'] === 200
+        && str_contains($databaseHtml['body'], 'ADMIN-HTTP')
+        && str_contains($databaseHtml['body'], 'Tổng 5 bản ghi'));
     $r = request($base, $adminCookie, 'suasanpham', [
         'id' => $adminSp['id'], 'ma_sp' => 'ADMIN-HTTP', 'ten_sp' => 'Sản phẩm đã sửa',
         'id_danhmuc' => $idDm, 'gia' => 950000, 'so_luong_goc' => 10, 'so_luong_ton' => 11,
@@ -452,10 +652,27 @@ try {
         'mat_khau' => '123456', 're_password' => '654321']);
     check('HTTP dang ky tu choi mat khau xac nhan khong khop', !empty($r['data']['loi'])
         && $kh->layTheoEmail('mismatch@test.local') === null);
+    $r = request($base, $cookie, 'google_login', [
+        'google_email' => 'forged@test.local',
+        'google_name' => 'Forged User',
+    ]);
+    check('HTTP Google tu choi email gia mao va khong tao tai khoan', $r['status'] === 302
+        && str_contains($r['location'], 'google_error')
+        && $kh->layTheoEmail('forged@test.local') === null);
+    $r = request($base, $cookie, 'dangky', [
+        'action' => 'gui_otp', 'ho_ten' => 'OTP User', 'email' => 'otp@test.local',
+        'mat_khau' => 'TestPassword123', 're_password' => 'TestPassword123',
+    ]);
+    check('HTTP OTP khong gui duoc thi bao loi va khong tiet lo ma', !empty($r['data']['loi'])
+        && !str_contains((string) $r['data']['loi'], 'Mã xác thực của bạn là')
+        && $kh->layTheoEmail('otp@test.local') === null);
     $r = request($base, $cookie, 'dangky', ['ho_ten' => 'HTTP User', 'email' => 'http@test.local',
         'mat_khau' => '123456', 'ngay_sinh' => '2001-02-03']);
     $httpKh = (int) $kh->layTheoEmail('http@test.local')['id'];
     check('HTTP dang ky tao khach hang trong CSDL', $r['status'] === 200 && $httpKh > 0 && $r['data']['loi'] === null);
+    $databaseHtml = requestHtml($base, $adminCookie, '/controller/index.php?khu=admin&act=csdl&bang=khachhang');
+    check('HTTP du lieu CSDL cap nhat sau thao tac dang ky cua user', $databaseHtml['status'] === 200
+        && str_contains($databaseHtml['body'], 'http@test.local'));
     $r = request($base, $cookie, 'dangnhap', ['email' => 'http@test.local', 'mat_khau' => 'sai']);
     check('HTTP dang nhap sai bi tu choi', !empty($r['data']['loi']));
     $oldCookie = $cookie;
@@ -470,7 +687,15 @@ try {
         && isset($p1['sp_km'][0]['gia_km'], $p1['sp_moi'][0]['gia_km']));
     $storefront = requestHtml($base, $cookie, '/controller/index.php?act=trangchu');
     check('HTTP storefront render san pham that tu CSDL', $storefront['status'] === 200
-        && str_contains($storefront['body'], 'San pham SP001'));
+        && str_contains($storefront['body'], 'San pham SP001')
+        && str_contains($storefront['body'], 'ai-phone-elegance.svg'));
+    $illustrations = [];
+    foreach (['ai-phone-elegance.svg', 'ai-phone-innovation.svg', 'ai-phone-portrait.svg', 'ai-accessories.svg'] as $image) {
+        $illustrations[] = requestHtml($base, $cookie, '/view/image/' . $image);
+    }
+    check('HTTP bon minh hoa SVG danh muc duoc phuc vu hop le', count(array_filter($illustrations, static fn(array $image): bool =>
+        $image['status'] === 200 && str_starts_with(ltrim($image['body']), '<svg')
+    )) === 4);
     $r = request($base, $cookie, 'timkiem&q=HETHANG');
     check('HTTP van hien SP het hang va co co het_hang', $r['data']['ds_sanpham'][0]['het_hang'] === true);
     $r = request($base, $cookie, 'chitiet&id=' . $idSp);
@@ -510,6 +735,14 @@ try {
     check('HTTP gui lai checkout khong tao don trung', !empty($r['data']['loi']) && count($dh->layTheoKhach($httpKh)) === 1);
     $r = request($base, $cookie, 'hopthu');
     check('HTTP hop thu co ban sao don vua dat', count($r['data']['ds_thu']) === 1 && str_contains($r['data']['ds_thu'][0]['tieu_de'], '#' . $httpDon));
+    $historyHtml = requestHtml($base, $cookie, '/controller/index.php?act=lichsumuahang');
+    $trackingHtml = requestHtml($base, $cookie, '/controller/index.php?act=theodoidonhang&id=' . $httpDon);
+    $mailboxHtml = requestHtml($base, $cookie, '/controller/index.php?act=hopthu');
+    check('HTTP lich su/theo doi/hop thu render du lieu DB cua khach', $historyHtml['status'] === 200
+        && $trackingHtml['status'] === 200 && $mailboxHtml['status'] === 200
+        && str_contains($historyHtml['body'], '#' . $httpDon)
+        && str_contains($trackingHtml['body'], '#' . $httpDon)
+        && str_contains($mailboxHtml['body'], '#' . $httpDon));
     $cookieKhac = '';
     request($base, $cookieKhac, 'dangnhap', ['email' => 'khac@test.local', 'mat_khau' => '123456']);
     $r = request($base, $cookieKhac, 'theodoidonhang&id=' . $httpDon);

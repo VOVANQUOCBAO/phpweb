@@ -217,11 +217,12 @@ class donhang extends xl_database
         if ($dh === null || (int) $dh['id_khachhang'] !== $idKh) {
             return ['ok' => false, 'loi' => 'Khong tim thay don hang'];
         }
-        if (trim($noiDung) === '') {
-            return ['ok' => false, 'loi' => 'Noi dung khieu nai rong'];
+        $noiDung = trim($noiDung);
+        if ($noiDung === '' || mb_strlen($noiDung) > 5000) {
+            return ['ok' => false, 'loi' => 'Nội dung khiếu nại phải từ 1 đến 5000 ký tự'];
         }
         require_once __DIR__ . '/email.php';
-        (new email())->luuThu($idKh, 'Khieu nai don #' . $id, trim($noiDung), 'khieunai');
+        (new email())->luuThu($idKh, 'Khiếu nại đơn #' . $id, $noiDung, 'khieunai');
         return ['ok' => true];
     }
 }

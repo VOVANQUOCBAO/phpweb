@@ -14,9 +14,11 @@ $admin_url = 'index.php?khu=admin';
                 <td><?=$dg['trang_thai'] ? 'Hiển thị' : 'Đã ẩn'?></td><td>
                     <?php if ($dg['trang_thai']): ?>
                         <form action="<?=$admin_url?>&amp;act=khoadanhgia" method="post" class="d-flex gap-1">
+                            <input type="hidden" name="_csrf" value="<?=$e($csrfToken)?>">
                             <input type="hidden" name="id" value="<?=$e($dg['id'])?>"><button class="btn btn-sm btn-outline-secondary">Ẩn</button>
                         </form>
                         <?php if ((int)$dg['so_sao'] <= 2): ?><form action="<?=$admin_url?>&amp;act=khoadanhgia" method="post" class="mt-1">
+                            <input type="hidden" name="_csrf" value="<?=$e($csrfToken)?>">
                             <input type="hidden" name="id" value="<?=$e($dg['id'])?>"><input type="hidden" name="khoa_khach" value="<?=$e($dg['id_khachhang'])?>">
                             <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Ẩn đánh giá và khóa khách hàng?')">Ẩn & khóa khách</button>
                         </form><?php endif; ?>

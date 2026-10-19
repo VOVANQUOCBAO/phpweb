@@ -19,7 +19,7 @@ Nếu không có quyền tạo CSDL, tạo `webbanhang_mvc` trước, chọn CSD
 
 Trước tiên, tạo cấu trúc CSDL bằng `setup.bat` hoặc import `database/webbanhang_mvc.sql`. Nếu chỉ import bằng phpMyAdmin, sau đó chạy `setup.bat` một lần để tạo tài khoản quản trị ban đầu. Sau đó chọn CSDL `webbanhang_mvc` trong phpMyAdmin và import [database/du_lieu_mau.sql](du_lieu_mau.sql).
 
-File dữ liệu mẫu có thể chạy lại: chỉ thêm các bản ghi chưa có theo mã sản phẩm, email, mã voucher và nội dung mẫu; không xóa hay ghi đè dữ liệu hiện tại. Trạng thái đơn hàng và tổng tiền đã căn theo quy tắc của ứng dụng. Tài khoản nhân viên mẫu dùng mật khẩu `password`; không dùng mật khẩu này cho tài khoản Admin.
+File dữ liệu mẫu có thể chạy lại: chỉ thêm các bản ghi chưa có theo mã sản phẩm, email, mã voucher và nội dung mẫu; không xóa dữ liệu hiện tại. File cập nhật riêng cột ảnh của sản phẩm để dùng minh họa SVG nguyên bản theo danh mục (`view/image/ai-*.svg`). Trạng thái đơn hàng và tổng tiền đã căn theo quy tắc của ứng dụng. Tài khoản nhân viên mẫu dùng mật khẩu `password`; không dùng mật khẩu này cho tài khoản Admin.
 
 Máy XAMPP mặc định dùng host `127.0.0.1`, port `3306`, user `root`, mật khẩu rỗng. Cấu hình riêng đặt trong `support/config/database.local.php` theo file mẫu `support/config/database.example.php`. Máy đang phát triển dùng port `3307`; cấu hình riêng đó không được đưa lên GitHub.
 

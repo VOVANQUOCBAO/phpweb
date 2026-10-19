@@ -71,4 +71,12 @@ Quy ước có thể chỉnh trong Model: phí ship 30.000đ; mỗi 1.000đ tổ
 
 Đặt biến môi trường `SMTP_USER` (Gmail), `SMTP_PASS` (mật khẩu ứng dụng), tùy chọn `SMTP_FROM`, rồi khởi động lại server PHP. Không ghi mật khẩu vào mã nguồn. SMTP dùng `smtp.gmail.com`, port 587, STARTTLS, timeout 10 giây.
 
-Khi chưa cấu hình Gmail hoặc gửi thất bại, đơn vẫn được lưu, giỏ đã xóa và bản sao thư vẫn nằm trong bảng `email`. Kết quả `email_result.smtp.ok` cho biết trạng thái gửi ra ngoài. Test chủ động vô hiệu hóa SMTP để không gửi email thật. Việc gửi Gmail thật cần tài khoản và thông tin SMTP của bạn; chưa được kiểm chứng bằng hộp thư thật.
+Khi chưa cấu hình Gmail hoặc gửi thất bại, đơn vẫn được lưu, giỏ đã xóa và bản sao thư vẫn nằm trong bảng `email`. Kết quả `email_result.smtp.ok` cho biết trạng thái gửi ra ngoài. Đăng ký bằng mật khẩu yêu cầu gửi OTP thành công; nếu gửi thất bại, trang báo lỗi và không tiết lộ mã. Test chủ động vô hiệu hóa SMTP để không gửi email thật. Việc gửi Gmail thật cần tài khoản và thông tin SMTP của bạn; chưa được kiểm chứng bằng hộp thư thật.
+
+## Google Sign-In và hosting
+
+Google Sign-In dùng Google Identity Services trên trình duyệt và xác minh ID token phía server bằng `google/apiclient`. Dependencies đã khóa trong Composer; cài Composer trên PHP 8.1+ rồi upload `support/vendor/` khi deploy. Cấu hình `GOOGLE_CLIENT_ID` và `APP_URL`, hoặc dùng file riêng `support/config/google.local.php` dựa trên `google.example.php`. Chi tiết bước tạo credential trong Google Cloud Console, chuẩn bị MySQL và checklist deploy nằm ở [DEPLOYMENT.md](DEPLOYMENT.md).
+
+Ứng dụng dùng MySQL/MariaDB; Supabase PostgreSQL không tương thích trực tiếp. Hosting PHP/MySQL miễn phí là hướng demo, chưa được kiểm chứng trên tài khoản hosting thực và không được đảm bảo phù hợp production.
+
+Các biểu mẫu ghi dữ liệu trong Admin cần POST kèm CSRF token; thao tác thay đổi qua GET bị từ chối. Tài khoản cũ có mật khẩu plaintext/MD5 sẽ được nâng cấp sang `password_hash()` ngay sau lần đăng nhập hợp lệ tiếp theo. Đổi mật khẩu Admin yêu cầu tối thiểu 12 ký tự.

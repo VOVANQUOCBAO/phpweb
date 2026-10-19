@@ -8,6 +8,14 @@ date_default_timezone_set('Asia/Ho_Chi_Minh');
 
 /* Hop dong View: support/README.md. Chua co View thi tra JSON de test. */
 if (session_status() !== PHP_SESSION_ACTIVE) {
+    ini_set('session.use_strict_mode', '1');
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'secure' => !empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off',
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
     session_start();
 }
 
@@ -142,6 +150,16 @@ $ctrl = new controller();
 $act = $ctrl->act();
 $thongBao = null;
 $loi = null;
+$googleConfigPath = BASE_PATH . '/support/config/google.local.php';
+$googleConfig = is_file($googleConfigPath) ? require $googleConfigPath : [];
+$googleConfig = is_array($googleConfig) ? $googleConfig : [];
+$googleClientId = trim((string) (getenv('GOOGLE_CLIENT_ID') ?: ($googleConfig['client_id'] ?? '')));
+$appUrl = rtrim((string) (getenv('APP_URL') ?: ($googleConfig['app_url'] ?? '')), '/');
+if ($appUrl === '' && isset($_SERVER['HTTP_HOST'])) {
+    $scheme = !empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off' ? 'https' : 'http';
+    $appUrl = $scheme . '://' . $_SERVER['HTTP_HOST'];
+}
+$googleLoginUri = $appUrl . '/controller/index.php?act=google_login';
 
 try {
     foreach ([$_GET, $_POST] as $inputs) {
@@ -188,24 +206,23 @@ try {
                 if ($matKhau !== $rePass) {
                     $loi = 'Mật khẩu xác nhận không trùng khớp';
                 } elseif ($action === 'gui_otp') {
-                    // Bước 1: Gửi mã OTP xác thực Gmail thật
                     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
                         $loi = 'Địa chỉ email không hợp lệ';
                     } elseif ($khModel->layTheoEmail($email) !== null) {
                         $loi = 'Email này đã tồn tại trong hệ thống. Vui lòng đăng nhập hoặc dùng email khác';
                     } else {
                         $otp = (string)random_int(100000, 999999);
-                        $_SESSION['dangky_pending'] = [
-                            'otp' => $otp,
-                            'time' => time(),
-                            'payload' => $payload,
-                        ];
-                        // Gửi email thật qua PHPMailer / Gmail SMTP
                         $mailRes = (new xuly_email())->guiOtp($email, $otp, $hoTen);
                         if ($mailRes['ok']) {
+                            $_SESSION['dangky_pending'] = [
+                                'otp' => $otp,
+                                'time' => time(),
+                                'payload' => $payload,
+                            ];
                             $thongBao = "Mã xác thực OTP đã được gửi đến hộp thư Gmail <strong>" . htmlspecialchars($email) . "</strong>! Vui lòng kiểm tra Hộp thư đến (hoặc Thư rác/Spam) để lấy mã.";
                         } else {
-                            $thongBao = "Mã xác thực OTP của bạn là: <strong class='text-primary fs-5'>{$otp}</strong> (Hệ thống đã tạo mã. Bạn có thể cấu hình Gmail App Password trong support/config/smtp.local.php để gửi thẳng về hòm thư Gmail thật).";
+                            unset($_SESSION['dangky_pending']);
+                            $loi = 'Không thể gửi mã xác thực đến email. Vui lòng thử lại sau hoặc đăng ký bằng Google.';
                         }
                     }
                 } elseif ($action === 'xacnhan_otp') {
@@ -239,7 +256,7 @@ try {
                     $loi = $kq['loi'];
                 }
             }
-            $ctrl->render('dangky.php', compact('thongBao', 'loi') + ['act' => $act]);
+            $ctrl->render('dangky.php', compact('thongBao', 'loi', 'googleClientId', 'googleLoginUri') + ['act' => $act]);
             break;
 
         case 'dangnhap':
@@ -252,7 +269,12 @@ try {
                 } else {
                     // 1. Kiểm tra tài khoản Quản trị / Nhân viên trước (Đăng nhập chung giao diện)
                     $kqAdmin = $nvModel->kiemTraDangNhap($email, $pass);
-                    if ($kqAdmin['ok']) {
+                    if ($kqAdmin['ok'] && in_array($kqAdmin['nhanvien']['vai_tro'] ?? '', [
+                        nhanvien::ROLE_SUPER_ADMIN,
+                        nhanvien::ROLE_MANAGER,
+                        nhanvien::ROLE_EMPLOYEE,
+                        'Admin',
+                    ], true)) {
                         session_regenerate_id(true);
                         $nv = $kqAdmin['nhanvien'];
                         $nv['hoten'] = $nv['ho_ten'] ?? 'Quản Trị Viên';
@@ -267,27 +289,6 @@ try {
                         session_regenerate_id(true);
                         $u = $kqKhach['khachhang'];
                         $u['hoten'] = $u['ho_ten'] ?? '';
-                        // Nếu là tài khoản Admin (tên đăng nhập admin hoặc email admin@local.test)
-                        if (strtolower(trim($email)) === 'admin' 
-                            || strtolower(trim($u['email'] ?? '')) === 'admin@local.test' 
-                            || strtolower(trim($u['ten_dang_nhap'] ?? '')) === 'admin') {
-                            $adminNv = $nvModel->selectOne("SELECT * FROM nhanvien WHERE vai_tro = 'Admin' LIMIT 1");
-                            if ($adminNv) {
-                                unset($adminNv['mat_khau']);
-                                $adminNv['hoten'] = $adminNv['ho_ten'] ?? 'Quản Trị Viên';
-                                $_SESSION['admin'] = $adminNv;
-                            } else {
-                                $_SESSION['admin'] = [
-                                    'id' => $u['id'],
-                                    'ho_ten' => $u['ho_ten'],
-                                    'hoten' => $u['ho_ten'],
-                                    'email' => $u['email'],
-                                    'vai_tro' => 'Admin'
-                                ];
-                            }
-                            $ctrl->redirect('sanpham', [], 'admin');
-                            return;
-                        }
                         $_SESSION['user'] = $u;
                         $ctrl->redirect('trangchu');
                         return;
@@ -302,33 +303,68 @@ try {
             if (isset($_GET['msg']) && $_GET['msg'] === 'registered') {
                 $thongBao = 'Đăng ký tài khoản thành công! Vui lòng đăng nhập để tiếp tục.';
             }
-            $ctrl->render('dangnhap.php', compact('thongBao', 'loi') + ['act' => $act]);
+            if (isset($_GET['google_error'])) {
+                $loi = 'Không thể xác thực tài khoản Google. Vui lòng thử lại hoặc đăng nhập bằng mật khẩu.';
+            }
+            $ctrl->render('dangnhap.php', compact('thongBao', 'loi', 'googleClientId', 'googleLoginUri') + ['act' => $act]);
             break;
 
         case 'google_login':
-            $gEmail = trim((string)($_POST['google_email'] ?? $_GET['google_email'] ?? ''));
-            $gName = trim((string)($_POST['google_name'] ?? $_GET['google_name'] ?? ''));
-            if ($gEmail !== '' && filter_var($gEmail, FILTER_VALIDATE_EMAIL)) {
-                $kh = $khModel->layTheoEmail($gEmail);
-                if ($kh === null) {
-                    $khModel->themKhachHang([
-                        'ho_ten' => $gName ?: explode('@', $gEmail)[0],
-                        'email' => $gEmail,
-                        'mat_khau' => bin2hex(random_bytes(8)),
-                        'hang' => khachhang::HANG_SILVER,
-                    ]);
-                    $kh = $khModel->layTheoEmail($gEmail);
-                    (new xuly_email())->guiChaoMung($gEmail, $kh['ho_ten'] ?? '');
-                }
-                if ($kh && (int)$kh['trang_thai'] === 1) {
-                    session_regenerate_id(true);
-                    $kh['hoten'] = $kh['ho_ten'] ?? '';
-                    $_SESSION['user'] = $kh;
-                    $ctrl->redirect('trangchu');
-                    return;
-                }
+            $csrfCookie = $_COOKIE['g_csrf_token'] ?? '';
+            $csrfPost = $_POST['g_csrf_token'] ?? '';
+            if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST'
+                || $googleClientId === ''
+                || !is_string($csrfCookie)
+                || !is_string($csrfPost)
+                || $csrfCookie === ''
+                || !hash_equals($csrfCookie, $csrfPost)
+                || !is_string($_POST['credential'] ?? null)) {
+                $ctrl->redirect('dangnhap', ['google_error' => '1']);
             }
-            $ctrl->redirect('dangnhap', ['loi' => 'dangnhap_google_thatbai']);
+
+            $googleAutoload = BASE_PATH . '/support/vendor/autoload.php';
+            if (!is_file($googleAutoload)) {
+                error_log('Google sign-in is configured but Google API Client is not installed');
+                $ctrl->redirect('dangnhap', ['google_error' => '1']);
+            }
+            require_once $googleAutoload;
+            if (!class_exists(\Google\Client::class)) {
+                error_log('Google sign-in requires google/apiclient');
+                $ctrl->redirect('dangnhap', ['google_error' => '1']);
+            }
+            try {
+                $googleClient = new \Google\Client(['client_id' => $googleClientId]);
+                $claims = $googleClient->verifyIdToken($_POST['credential']);
+                if (!is_array($claims)
+                    || !isset($claims['sub'], $claims['email'])
+                    || !filter_var($claims['email'], FILTER_VALIDATE_EMAIL)
+                    || !filter_var($claims['email_verified'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                    throw new RuntimeException('Google ID token did not contain verified account claims');
+                }
+                $kqGoogle = $khModel->dangNhapGoogle(
+                    (string) $claims['sub'],
+                    (string) $claims['email'],
+                    (string) ($claims['name'] ?? '')
+                );
+                if (!$kqGoogle['ok']) {
+                    throw new RuntimeException((string) $kqGoogle['loi']);
+                }
+                session_regenerate_id(true);
+                $u = $kqGoogle['khachhang'];
+                $u['hoten'] = $u['ho_ten'] ?? '';
+                $_SESSION['user'] = $u;
+                if (!empty($kqGoogle['created'])) {
+                    try {
+                        (new xuly_email())->guiChaoMung((string) $u['email'], (string) $u['ho_ten']);
+                    } catch (Throwable $e) {
+                        error_log('Google account welcome email: ' . $e->getMessage());
+                    }
+                }
+                $ctrl->redirect('trangchu');
+            } catch (Throwable $e) {
+                error_log('Google sign-in verification: ' . $e->getMessage());
+                $ctrl->redirect('dangnhap', ['google_error' => '1']);
+            }
             break;
 
         case 'dangxuat':
@@ -518,6 +554,11 @@ try {
                 $ctrl->redirect('dangnhap');
             }
             $ds_donhang = $dhModel->layTheoKhach((int) $user['id']);
+            $ctModel = new chitietdonhang();
+            foreach ($ds_donhang as &$don) {
+                $don['chitiet'] = $ctModel->layTheoDon((int) $don['id']);
+            }
+            unset($don);
             $ctrl->render('lichsu_muahang.php', compact('ds_donhang', 'thongBao', 'loi') + ['act' => $act]);
             break;
 
@@ -557,9 +598,11 @@ try {
                 $ctrl->redirect('dangnhap');
             }
             $idDon = (int) ($_GET['id'] ?? 0);
-            $donhang = $dhModel->layTrangThai($idDon);
+            $donhang = $idDon > 0 ? $dhModel->layTrangThai($idDon) : null;
             if ($donhang === null || (int) $donhang['id_khachhang'] !== (int) $user['id']) {
-                $loi = 'Khong tim thay don hang';
+                if ($idDon > 0) {
+                    $loi = 'Không tìm thấy đơn hàng của bạn.';
+                }
                 $donhang = null;
             }
             $ctrl->render('theodoi_donhang.php', compact('donhang', 'thongBao', 'loi') + ['act' => $act]);
@@ -571,7 +614,21 @@ try {
                 $ctrl->redirect('dangnhap');
             }
             $ds_thu = $emModel->layThuCuaKhach((int) $user['id']);
-            $ctrl->render('hopthu.php', compact('ds_thu', 'thongBao', 'loi') + ['act' => $act]);
+            $thuDangXem = null;
+            $thuId = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            foreach ($ds_thu as $thu) {
+                if (($thuId !== false && $thuId !== null && (int) $thu['id'] === $thuId)
+                    || (($thuId === false || $thuId === null) && $thuDangXem === null)) {
+                    $thuDangXem = $thu;
+                    if ($thuId !== false && $thuId !== null) {
+                        break;
+                    }
+                }
+            }
+            if ($thuId !== false && $thuId !== null && $thuDangXem === null) {
+                $loi = 'Không tìm thấy thư trong hộp thư của bạn.';
+            }
+            $ctrl->render('hopthu.php', compact('ds_thu', 'thuDangXem', 'thongBao', 'loi') + ['act' => $act]);
             break;
 
         case 'admin':

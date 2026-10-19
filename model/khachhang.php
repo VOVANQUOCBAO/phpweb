@@ -36,6 +36,63 @@ class khachhang extends xl_database
         return $this->selectOne('SELECT * FROM khachhang WHERE email = ?', [trim($email)]);
     }
 
+    public function dangNhapGoogle(string $sub, string $email, string $hoTen): array
+    {
+        $sub = trim($sub);
+        $email = trim($email);
+        $hoTen = trim($hoTen);
+        if ($sub === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return ['ok' => false, 'loi' => 'Thông tin xác thực Google không hợp lệ'];
+        }
+
+        $created = false;
+        try {
+            $kh = $this->selectOne('SELECT * FROM khachhang WHERE google_sub = ?', [$sub]);
+            if ($kh === null) {
+                $kh = $this->layTheoEmail($email);
+                if ($kh !== null) {
+                    if ((int) $kh['trang_thai'] !== 1) {
+                        return ['ok' => false, 'loi' => 'Tài khoản của bạn đã bị tạm khóa'];
+                    }
+                    if (!empty($kh['google_sub']) && !hash_equals((string) $kh['google_sub'], $sub)) {
+                        return ['ok' => false, 'loi' => 'Email này đã được liên kết với một tài khoản Google khác'];
+                    }
+                    $this->update('khachhang', ['google_sub' => $sub], 'id = ?', [(int) $kh['id']]);
+                    $kh['google_sub'] = $sub;
+                } else {
+                    $id = $this->insert('khachhang', [
+                        'ho_ten' => $hoTen !== '' ? $hoTen : explode('@', $email)[0],
+                        'email' => $email,
+                        'google_sub' => $sub,
+                        'mat_khau' => password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT),
+                        'hang' => self::HANG_SILVER,
+                        'diem' => 0,
+                        'trang_thai' => 1,
+                    ]);
+                    $kh = $this->layTheoId($id);
+                    $created = true;
+                }
+            }
+        } catch (PDOException $e) {
+            if ($e->getCode() !== '23000') {
+                throw $e;
+            }
+            $kh = $this->selectOne('SELECT * FROM khachhang WHERE google_sub = ?', [$sub]);
+            if ($kh === null) {
+                $kh = $this->layTheoEmail($email);
+            }
+        }
+
+        if ($kh === null || (int) $kh['trang_thai'] !== 1) {
+            return ['ok' => false, 'loi' => 'Tài khoản Google chưa được liên kết hoặc đang bị khóa'];
+        }
+        if (empty($kh['google_sub']) || !hash_equals((string) $kh['google_sub'], $sub)) {
+            return ['ok' => false, 'loi' => 'Không thể liên kết tài khoản Google này'];
+        }
+        unset($kh['mat_khau']);
+        return ['ok' => true, 'khachhang' => $kh, 'created' => $created];
+    }
+
     public function themKhachHang(array $data): array
     {
         $email = trim((string) ($data['email'] ?? ''));
@@ -101,20 +158,12 @@ class khachhang extends xl_database
         if ($kh === null) {
             return ['ok' => false, 'loi' => 'Email hoặc mật khẩu không chính xác'];
         }
-        $matKhauDb = (string)($kh['mat_khau'] ?? '');
-        $dung = false;
-        if ($matKhau === $matKhauDb) {
-            $dung = true; // Cho phép khớp chữ thường nếu chỉnh trong phpMyAdmin
-        } elseif (password_verify($matKhau, $matKhauDb)) {
-            $dung = true; // Bcrypt hash
-        } elseif (md5($matKhau) === $matKhauDb) {
-            $dung = true; // MD5 hash
-        }
-        if (!$dung) {
-            return ['ok' => false, 'loi' => 'Email hoặc mật khẩu không chính xác'];
-        }
         if ((int) $kh['trang_thai'] !== 1) {
             return ['ok' => false, 'loi' => 'Tài khoản của bạn đã bị tạm khóa'];
+        }
+        $matKhauDb = (string) ($kh['mat_khau'] ?? '');
+        if (!$this->xacThucVaNangCapMatKhau($matKhau, $matKhauDb, 'khachhang', (int) $kh['id'])) {
+            return ['ok' => false, 'loi' => 'Email hoặc mật khẩu không chính xác'];
         }
         unset($kh['mat_khau']);
         return ['ok' => true, 'khachhang' => $kh];

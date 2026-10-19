@@ -2,7 +2,8 @@ USE webbanhang_mvc;
 SET NAMES utf8mb4;
 START TRANSACTION;
 
--- Du lieu mau cho website; chi them ban ghi con thieu, khong xoa/ghi de du lieu cu.
+-- Du lieu mau cho website; chi them ban ghi con thieu, khong xoa du lieu cu.
+-- Anh san pham duoc gan lai theo bo minh hoa SVG nguyen ban trong view/image.
 
 INSERT INTO danhmuc (ten_danhmuc, mo_ta)
 SELECT 'Điện thoại iPhone', 'Các dòng điện thoại Apple iPhone chính hãng VN/A'
@@ -31,7 +32,7 @@ SET @dm_phukien := (SELECT id FROM danhmuc WHERE ten_danhmuc = 'Phụ kiện' OR
 
 INSERT INTO sanpham (ma_sp, ten_sp, id_danhmuc, gia, so_luong_goc, so_luong_ton, hinh, mo_ta)
 SELECT 'IP15PM256', 'iPhone 15 Pro Max 256GB', @dm_iphone, 29990000.00, 100, 85,
-       'iphone 15 pro max.jpeg',
+       'ai-phone-elegance.svg',
        'iPhone 15 Pro Max thiết kế titan, camera zoom quang học 5x, chip A17 Pro siêu mạnh mẽ.'
 FROM DUAL
 WHERE @dm_iphone IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sanpham WHERE ma_sp = 'IP15PM256');
@@ -44,7 +45,7 @@ WHERE @dm_iphone IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sanpham WHERE ma_sp =
 
 INSERT INTO sanpham (ma_sp, ten_sp, id_danhmuc, gia, so_luong_goc, so_luong_ton, hinh, mo_ta)
 SELECT 'SS24U512', 'Samsung Galaxy S24 Ultra 512GB', @dm_samsung, 31990000.00, 80, 70,
-       'Samsung Galaxy S24 Ultra 5G.jpg',
+       'ai-phone-innovation.svg',
        'Tích hợp AI tiên tiến, khung viền titan và bút S-Pen thế hệ mới nhất.'
 FROM DUAL
 WHERE @dm_samsung IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sanpham WHERE ma_sp = 'SS24U512');
@@ -60,6 +61,11 @@ SELECT 'AP20W', 'Củ sạc Apple 20W Type-C', @dm_phukien, 550000.00, 200, 150,
        NULL, 'Củ sạc nhanh 20W chính hãng Apple dùng cho iPhone, iPad.'
 FROM DUAL
 WHERE @dm_phukien IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sanpham WHERE ma_sp = 'AP20W');
+
+UPDATE sanpham SET hinh = 'ai-phone-elegance.svg' WHERE id_danhmuc = @dm_iphone;
+UPDATE sanpham SET hinh = 'ai-phone-innovation.svg' WHERE id_danhmuc = @dm_samsung;
+UPDATE sanpham SET hinh = 'ai-phone-portrait.svg' WHERE id_danhmuc = @dm_xiaomi;
+UPDATE sanpham SET hinh = 'ai-accessories.svg' WHERE id_danhmuc = @dm_phukien;
 
 INSERT INTO khachhang (ho_ten, email, mat_khau, ngay_sinh, hang, diem, trang_thai)
 SELECT 'Nguyễn Văn An', 'nguyenvanan@gmail.com',

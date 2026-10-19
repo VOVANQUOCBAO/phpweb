@@ -44,7 +44,7 @@ $user_home_url = 'index.php?act=trangchu';
                             <i class="fas fa-shield-alt fs-3"></i>
                         </div>
                         <h4 class="fw-bold mb-0">CỔNG QUẢN TRỊ ADMIN</h4>
-                        <small class="text-secondary">Dành riêng cho Nhân viên & Ban quản trị</small>
+                        <small class="text-secondary">Đăng nhập theo vai trò được cấp</small>
                     </div>
 
                     <div class="card-body p-4 p-md-5">
@@ -69,6 +69,7 @@ $user_home_url = 'index.php?act=trangchu';
                         <?php endif; ?>
 
                         <form action="<?=$admin_ctrl_url?>&act=dangnhap" method="POST">
+                            <input type="hidden" name="_csrf" value="<?=htmlspecialchars($csrfToken, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')?>">
                             <div class="mb-3">
                                 <label class="form-label fw-semibold small text-dark">Email hoặc tên đăng nhập</label>
                                 <div class="input-group">

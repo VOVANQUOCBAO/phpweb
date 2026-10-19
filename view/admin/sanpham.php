@@ -10,13 +10,15 @@ $formatTien = static fn($value): string => number_format((float) $value, 0, ',',
 <div class="container-fluid">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <div>
-            <h3 class="fw-bold text-dark mb-1"><i class="fas fa-boxes text-primary me-2"></i>Quản lý sản phẩm và danh mục</h3>
+            <h3 class="fw-bold text-dark mb-1"><i class="fas fa-boxes text-primary me-2"></i><?=$isSuperAdmin ? 'Quản lý sản phẩm và danh mục' : 'Danh sách sản phẩm'?></h3>
             <p class="text-muted small mb-0">Dữ liệu được đọc và lưu trực tiếp trên cơ sở dữ liệu.</p>
         </div>
+        <?php if ($isSuperAdmin): ?>
         <button class="btn btn-outline-primary btn-sm rounded-pill px-3" type="button"
                 data-bs-toggle="modal" data-bs-target="#modalDanhMuc">
             <i class="fas fa-folder-open me-1"></i> Quản lý danh mục
         </button>
+        <?php endif; ?>
     </div>
 
     <?php if (!empty($thongBao)): ?>
@@ -32,12 +34,14 @@ $formatTien = static fn($value): string => number_format((float) $value, 0, ',',
         </div>
     <?php endif; ?>
 
+    <?php if ($isSuperAdmin): ?>
     <div class="card border-0 shadow-sm rounded-4 mb-4" id="product-form-card">
         <div class="card-header bg-primary text-white py-3 px-4 rounded-top-4">
             <h5 class="mb-0 fw-bold"><i class="fas fa-edit me-2"></i><span id="form-title">Thêm sản phẩm</span></h5>
         </div>
         <div class="card-body p-4">
             <form action="index.php?act=themsanpham" method="POST" id="spForm">
+                <input type="hidden" name="_csrf" value="<?= $h($csrfToken) ?>">
                 <input type="hidden" name="id" id="form_id" disabled>
                 <div class="row g-3">
                     <div class="col-12 col-md-3">
@@ -80,7 +84,7 @@ $formatTien = static fn($value): string => number_format((float) $value, 0, ',',
                     <div class="col-12 col-md-6">
                         <label for="form_hinh" class="form-label small fw-bold">Tên tệp ảnh (tùy chọn)</label>
                         <input type="text" name="hinh" id="form_hinh" class="form-control" maxlength="255"
-                               placeholder="Ví dụ: iPhone 16 256GB.png">
+                               placeholder="Ví dụ: ai-phone-elegance.svg">
                     </div>
                     <div class="col-12">
                         <label for="form_mo_ta" class="form-label small fw-bold">Mô tả sản phẩm</label>
@@ -96,6 +100,7 @@ $formatTien = static fn($value): string => number_format((float) $value, 0, ',',
             </form>
         </div>
     </div>
+    <?php endif; ?>
 
     <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
         <div class="card-header bg-white py-3 px-4">
@@ -112,12 +117,12 @@ $formatTien = static fn($value): string => number_format((float) $value, 0, ',',
                         <th>SL gốc</th>
                         <th>Tồn kho</th>
                         <th>Đã bán</th>
-                        <th>Thao tác</th>
+                        <?php if ($isSuperAdmin): ?><th>Thao tác</th><?php endif; ?>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if ($dsSanPham === []): ?>
-                        <tr><td colspan="8" class="text-muted py-4">Chưa có sản phẩm. Dùng biểu mẫu phía trên để thêm mới.</td></tr>
+                        <tr><td colspan="<?=$isSuperAdmin ? 8 : 7?>" class="text-muted py-4">Chưa có sản phẩm.<?=$isSuperAdmin ? ' Dùng biểu mẫu phía trên để thêm mới.' : ''?></td></tr>
                     <?php endif; ?>
                     <?php foreach ($dsSanPham as $sp): ?>
                         <?php
@@ -143,17 +148,18 @@ $formatTien = static fn($value): string => number_format((float) $value, 0, ',',
                             <td><?= (int) $sp['so_luong_goc'] ?></td>
                             <td><span class="badge <?= $ton <= 5 ? 'bg-danger' : 'bg-success' ?>"><?= $ton ?></span></td>
                             <td><?= (int) $sp['da_ban'] ?></td>
-                            <td>
+                            <?php if ($isSuperAdmin): ?><td>
                                 <div class="d-flex justify-content-center gap-1">
                                     <button type="button" class="btn btn-outline-primary btn-sm"
                                             data-product="<?= $h($json) ?>" onclick="editSP(this)">Sửa</button>
                                     <form action="index.php?act=xoasanpham" method="POST"
                                           onsubmit="return confirm('Chỉ xóa được sản phẩm chưa xuất hiện trong chi tiết đơn hàng. Tiếp tục?')">
+                                        <input type="hidden" name="_csrf" value="<?= $h($csrfToken) ?>">
                                         <input type="hidden" name="id" value="<?= (int) $sp['id'] ?>">
                                         <button type="submit" class="btn btn-outline-danger btn-sm">Xóa</button>
                                     </form>
                                 </div>
-                            </td>
+                            </td><?php endif; ?>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -162,6 +168,7 @@ $formatTien = static fn($value): string => number_format((float) $value, 0, ',',
     </div>
 </div>
 
+<?php if ($isSuperAdmin): ?>
 <div class="modal fade" id="modalDanhMuc" tabindex="-1" aria-labelledby="modalDanhMucLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content rounded-4 border-0 shadow">
@@ -173,6 +180,7 @@ $formatTien = static fn($value): string => number_format((float) $value, 0, ',',
             </div>
             <div class="modal-body p-4">
                 <form action="index.php?act=danhmuc" method="POST" class="border rounded-3 p-3 mb-4">
+                    <input type="hidden" name="_csrf" value="<?= $h($csrfToken) ?>">
                     <input type="hidden" name="hanh_dong" value="them">
                     <h6 class="fw-bold">Thêm danh mục</h6>
                     <div class="mb-2">
@@ -193,6 +201,7 @@ $formatTien = static fn($value): string => number_format((float) $value, 0, ',',
                 <?php foreach ($dsDanhMuc as $dm): ?>
                     <div class="border rounded-3 p-3 mb-3">
                         <form action="index.php?act=danhmuc" method="POST">
+                            <input type="hidden" name="_csrf" value="<?= $h($csrfToken) ?>">
                             <input type="hidden" name="hanh_dong" value="sua">
                             <input type="hidden" name="id" value="<?= (int) $dm['id'] ?>">
                             <div class="row g-2 align-items-end">
@@ -214,6 +223,7 @@ $formatTien = static fn($value): string => number_format((float) $value, 0, ',',
                         </form>
                         <form action="index.php?act=danhmuc" method="POST" class="mt-2"
                               onsubmit="return confirm('Xóa danh mục này? Chỉ xóa được khi không còn sản phẩm hoặc khuyến mãi liên quan.')">
+                            <input type="hidden" name="_csrf" value="<?= $h($csrfToken) ?>">
                             <input type="hidden" name="hanh_dong" value="xoa">
                             <input type="hidden" name="id" value="<?= (int) $dm['id'] ?>">
                             <button type="submit" class="btn btn-outline-danger btn-sm">Xóa danh mục</button>
@@ -223,7 +233,7 @@ $formatTien = static fn($value): string => number_format((float) $value, 0, ',',
             </div>
         </div>
     </div>
-</div>
+    <?php endif; ?>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>

@@ -96,6 +96,30 @@ class xl_database extends csdl
         return $ngay !== false && $ngay->format('Y-m-d') === $value;
     }
 
+    protected function xacThucVaNangCapMatKhau(string $matKhau, string $matKhauDb, string $table, int $id): bool
+    {
+        $legacy = false;
+        if (password_verify($matKhau, $matKhauDb)) {
+            if (!password_needs_rehash($matKhauDb, PASSWORD_DEFAULT)) {
+                return true;
+            }
+        } elseif (hash_equals($matKhauDb, $matKhau)
+            || (preg_match('/^[a-f0-9]{32}$/i', $matKhauDb) === 1
+                && hash_equals(strtolower($matKhauDb), md5($matKhau)))) {
+            $legacy = true;
+        } else {
+            return false;
+        }
+
+        if ($legacy || password_needs_rehash($matKhauDb, PASSWORD_DEFAULT)) {
+            if (!in_array($table, ['khachhang', 'nhanvien'], true) || $id <= 0) {
+                throw new LogicException('Không thể nâng cấp mật khẩu cho bản ghi này.');
+            }
+            $this->update($table, ['mat_khau' => password_hash($matKhau, PASSWORD_DEFAULT)], 'id = ?', [$id]);
+        }
+        return true;
+    }
+
     private function assertTenBang(string $table): string
     {
         if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
