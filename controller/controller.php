@@ -10,7 +10,6 @@ class controller
             (isset($_GET['ajax']) && $_GET['ajax'] == '1') ||
             (isset($_SERVER['HTTP_ACCEPT']) && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json')) ||
             (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') ||
-            str_starts_with(getenv('DB_NAME') ?: '', 'webbanhang_mvc_test_') ||
             empty($_SERVER['HTTP_USER_AGENT'])
         );
 

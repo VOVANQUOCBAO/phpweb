@@ -2,7 +2,7 @@
 
 ## Chạy dự án
 
-Từ thư mục gốc, nhấp đúp `setup.bat` rồi mở **http://localhost:8000/**. Script tự tìm XAMPP tại `C:\xampp`, `D:\xampp`, `D:\data` hoặc biến `XAMPP_PATH`, khởi tạo CSDL còn thiếu và chạy server PHP. Các tiến trình chạy nền; script in PID để có thể dừng bằng `Stop-Process -Id <PID>` khi xong.
+Từ thư mục gốc, nhấp đúp `setup.bat` rồi mở **http://127.0.0.1:8000/**. Dùng `127.0.0.1` để chắc chắn truy cập đúng PHP server của dự án, tránh trường hợp `localhost` trỏ tới một server khác. Script tự tìm XAMPP tại `C:\xampp`, `D:\xampp`, `D:\data` hoặc biến `XAMPP_PATH`, khởi tạo CSDL còn thiếu và chạy server PHP. Các tiến trình chạy nền; script in PID để có thể dừng bằng `Stop-Process -Id <PID>` khi xong.
 
 Nếu cần chỉ định thư mục hoặc cổng:
 

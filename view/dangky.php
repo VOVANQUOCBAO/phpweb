@@ -9,10 +9,12 @@
                 </div>
 
                 <div class="card-body p-4 p-md-5">
-                    <?php if (isset($error_msg)): ?>
+                    <?php if (!empty($loi)): ?>
                         <div class="alert alert-danger rounded-3 small">
-                            <i class="fas fa-exclamation-triangle me-1"></i> <?=$error_msg?>
+                            <i class="fas fa-exclamation-triangle me-1"></i> <?=htmlspecialchars((string) $loi, ENT_QUOTES, 'UTF-8')?>
                         </div>
+                    <?php elseif (!empty($thongBao)): ?>
+                        <div class="alert alert-success rounded-3 small"><?=htmlspecialchars((string) $thongBao, ENT_QUOTES, 'UTF-8')?></div>
                     <?php endif; ?>
 
                     <form action="index.php?act=dangky" method="POST">
@@ -21,16 +23,7 @@
                             <label class="form-label fw-semibold small">Họ và tên của bạn <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light"><i class="fas fa-user text-muted"></i></span>
-                                <input type="text" name="hoten" class="form-control" placeholder="Nguyễn Văn A" required>
-                            </div>
-                        </div>
-
-                        <!-- Tên đăng nhập -->
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold small">Tên đăng nhập <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-light"><i class="fas fa-at text-muted"></i></span>
-                                <input type="text" name="username" class="form-control" placeholder="nguyenvana" required>
+                                <input type="text" name="ho_ten" class="form-control" placeholder="Nguyễn Văn A" required>
                             </div>
                         </div>
 
@@ -46,29 +39,20 @@
                         <!-- Ngày tháng năm sinh để nhận quà/voucher [17/6] -->
                         <div class="mb-3">
                             <label class="form-label fw-semibold small">
-                                <i class="fas fa-birthday-cake text-danger me-1"></i> Ngày sinh (Nhận quà tặng & Voucher sinh nhật) [17/6] <span class="text-danger">*</span>
+                                <i class="fas fa-birthday-cake text-danger me-1"></i> Ngày sinh (không bắt buộc)
                             </label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light"><i class="fas fa-calendar-alt text-muted"></i></span>
-                                <input type="date" name="ngaysinh" class="form-control" required>
+                                <input type="date" name="ngay_sinh" class="form-control">
                             </div>
-                            <small class="text-muted">Hệ thống sẽ tự động gửi mã giảm giá chúc mừng sinh nhật vào hộp thư của bạn.</small>
-                        </div>
-
-                        <!-- Số điện thoại -->
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold small">Số điện thoại nhận hàng <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-light"><i class="fas fa-phone text-muted"></i></span>
-                                <input type="tel" name="sdt" class="form-control" placeholder="0901234567" required>
-                            </div>
+                            <small class="text-muted">Không bắt buộc. Có ngày sinh, bạn có thể nhận ưu đãi sinh nhật.</small>
                         </div>
 
                         <!-- Mật khẩu -->
                         <div class="row g-2 mb-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold small">Mật khẩu <span class="text-danger">*</span></label>
-                                <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+                                <input type="password" name="mat_khau" class="form-control" placeholder="••••••••" required>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold small">Nhập lại mật khẩu <span class="text-danger">*</span></label>
@@ -97,4 +81,3 @@
         </div>
     </div>
 </div>
-

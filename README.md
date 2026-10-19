@@ -4,15 +4,17 @@ Website bán hàng theo mô hình **MVC**, viết bằng **PHP thuần**, kết 
 
 **PHP 8+** · **MySQL / MariaDB** · **XAMPP** · **PHPMailer**
 
-> Hiện đã hoàn thiện backend Model và Controller User. Khi chưa có View tương ứng, ứng dụng trả JSON để kiểm tra dữ liệu.
+> Bản hiện tại có giao diện khách hàng và khu vực quản trị MVC; dữ liệu màn hình được đọc/ghi qua Model và MySQL. CSDL mới chỉ có tài khoản quản trị mẫu, các danh mục, sản phẩm và dữ liệu nghiệp vụ cần được nhập qua trang quản trị.
 
 ## Chạy nhanh
 
 1. Tải mã nguồn và giải nén; máy cần cài XAMPP có PHP 8 trở lên.
 2. Nhấp đúp **`setup.bat`**. CSDL và các bảng còn thiếu sẽ được khởi tạo tự động.
-3. Mở **http://localhost:8000/**.
+3. Mở **http://127.0.0.1:8000/**.
 
 Không cần cài Composer. Nếu MySQL có mật khẩu riêng, sửa `support/config/database.local.php`. [Xem cấu hình và cách chạy khác →](support/README.md)
+
+Trang quản trị: **http://127.0.0.1:8000/index.php?khu=admin**. Tài khoản mẫu: `admin@local.test` / `password`.
 
 ## Cấu trúc
 
@@ -34,6 +36,6 @@ phpweb/
 | Import CSDL bằng phpMyAdmin | [database/README.md](database/README.md) |
 | Cấu hình, kiểm thử và ghép View | [support/README.md](support/README.md) |
 
-**Kiểm thử:** 67/67 ca đạt, bao gồm luồng HTTP, Session, rollback và xử lý đồng thời. Test dùng CSDL tạm riêng, giữ nguyên dữ liệu ứng dụng.
+**Kiểm thử:** 80/80 ca đạt, bao gồm Model, luồng HTTP khách hàng/quản trị, Session, rollback và xử lý đồng thời. Test dùng CSDL tạm riêng, giữ nguyên dữ liệu ứng dụng.
 
 **Email:** có sẵn PHPMailer. Gửi Gmail thật cần `SMTP_USER` và `SMTP_PASS`; khi chưa cấu hình, hệ thống vẫn lưu bản sao thư trong CSDL.

@@ -144,6 +144,30 @@ function request(string $base, string &$cookie, string $act = '', ?array $post =
     return ['status' => $status, 'data' => $data, 'location' => $location];
 }
 
+function requestHtml(string $base, string &$cookie, string $path, ?array $post = null): array
+{
+    $headers = "User-Agent: PHPWebIntegrationTest\r\nCookie: {$cookie}\r\n";
+    if ($post !== null) {
+        $headers .= "Content-Type: application/x-www-form-urlencoded\r\n";
+    }
+    $ctx = stream_context_create(['http' => ['method' => $post === null ? 'GET' : 'POST',
+        'header' => $headers, 'content' => $post === null ? '' : http_build_query($post),
+        'ignore_errors' => true, 'follow_location' => 0, 'timeout' => 10]]);
+    $body = file_get_contents($base . $path, false, $ctx);
+    $status = 0;
+    $location = '';
+    foreach ($http_response_header ?? [] as $header) {
+        if (preg_match('/^HTTP\/\S+ (\d+)/', $header, $m)) {
+            $status = (int) $m[1];
+        } elseif (preg_match('/^Set-Cookie:\s*([^;]+)/i', $header, $m)) {
+            $cookie = $m[1];
+        } elseif (stripos($header, 'Location: ') === 0) {
+            $location = substr($header, 10);
+        }
+    }
+    return ['status' => $status, 'body' => $body === false ? '' : $body, 'location' => $location];
+}
+
 function counts(PDO $pdo, string $db): array
 {
     $out = [];
@@ -362,6 +386,10 @@ try {
     check('HTTP index goc chuyen huong dung controller va giu act', $r['status'] === 302 && $r['location'] === 'controller/index.php?act=timkiem');
     $r = request($base, $cookie, 'thanhtoan');
     check('HTTP chua dang nhap khong duoc thanh toan', $r['status'] === 302 && str_contains($r['location'], 'dangnhap'));
+    $r = request($base, $cookie, 'dangky', ['ho_ten' => 'Mismatch User', 'email' => 'mismatch@test.local',
+        'mat_khau' => '123456', 're_password' => '654321']);
+    check('HTTP dang ky tu choi mat khau xac nhan khong khop', !empty($r['data']['loi'])
+        && $kh->layTheoEmail('mismatch@test.local') === null);
     $r = request($base, $cookie, 'dangky', ['ho_ten' => 'HTTP User', 'email' => 'http@test.local',
         'mat_khau' => '123456', 'ngay_sinh' => '2001-02-03']);
     $httpKh = (int) $kh->layTheoEmail('http@test.local')['id'];
@@ -378,6 +406,11 @@ try {
     check('HTTP phan trang/Xem them khong lap SP, co tong va con_tiep', count($p1['ds_sanpham']) === 1
         && $p1['ds_sanpham'][0]['id'] !== $p2['ds_sanpham'][0]['id'] && $p1['con_tiep']
         && isset($p1['sp_km'][0]['gia_km'], $p1['sp_moi'][0]['gia_km']));
+    $httpSp = spTest($idDm, 'HTTP', 10, 1000000);
+    $storefront = requestHtml($base, $cookie, '/controller/index.php?act=trangchu');
+    check('HTTP cua hang render san pham that tu CSDL', $storefront['status'] === 200
+        && str_contains($storefront['body'], 'San pham HTTP')
+        && str_contains($storefront['body'], 'Tất cả sản phẩm'));
     $r = request($base, $cookie, 'timkiem&q=HETHANG');
     check('HTTP van hien SP het hang va co co het_hang', $r['data']['ds_sanpham'][0]['het_hang'] === true);
     $r = request($base, $cookie, 'chitiet&id=' . $idSp);
@@ -385,8 +418,12 @@ try {
     $r = request($base, $cookie, 'themdanhgia', ['id_sanpham' => $idSp, 'so_sao' => 4, 'noi_dung' => 'Danh gia HTTP']);
     check('HTTP gui danh gia bang session user, giu day du du lieu chi tiet', count($r['data']['ds_danhgia']) === 1
         && (int) $r['data']['ds_danhgia'][0]['id_khachhang'] === $httpKh && isset($r['data']['chitiet']['gia_km']));
-    $httpSp = spTest($idDm, 'HTTP', 10, 1000000);
     request($base, $cookie, 'themgiohang&id=' . $httpSp . '&sl=2');
+    $checkoutHtml = requestHtml($base, $cookie, '/controller/index.php?act=thanhtoan');
+    check('HTTP thanh toan hien cac truong duoc backend chap nhan', $checkoutHtml['status'] === 200
+        && str_contains($checkoutHtml['body'], 'name="dia_chi"')
+        && str_contains($checkoutHtml['body'], 'name="sdt"')
+        && str_contains($checkoutHtml['body'], 'name="ma_voucher"'));
     $r = request($base, $cookie, 'suagiohang', ['id' => $httpSp, 'sl' => 3]);
     check('HTTP gio hang luu qua nhieu request bang cookie', $r['data']['giohang']['items'][0]['so_luong'] === 3);
     $r = request($base, $cookie, 'suagiohang', ['id' => $httpSp, 'sl' => -1]);
@@ -442,6 +479,54 @@ try {
     check('HTTP act khong ton tai tra 400', $r['status'] === 400);
     $r = request($base, $cookie, 'dangnhap', ['email' => ['x'], 'mat_khau' => '123456']);
     check('HTTP tham so mang bi tu choi co kiem soat', $r['status'] === 400);
+
+    $adminCookie = '';
+    $r = requestHtml($base, $adminCookie, '/index.php?khu=admin&act=dangnhap');
+    check('HTTP admin login hien tai khoan mau dung SQL', $r['status'] === 200
+        && str_contains($r['body'], 'value="password"'));
+    $oldAdminCookie = $adminCookie;
+    $r = requestHtml($base, $adminCookie, '/index.php?khu=admin&act=dangnhap',
+        ['admin_user' => 'admin', 'admin_pass' => 'password']);
+    check('HTTP admin dang nhap dung, doi session va dieu huong khu admin',
+        $r['status'] === 302 && $adminCookie !== '' && $adminCookie !== $oldAdminCookie
+        && str_contains($r['location'], 'khu=admin'));
+    $r = requestHtml($base, $adminCookie, '/index.php?khu=admin&act=sanpham');
+    check('HTTP admin san pham chi hien du lieu that, khong hien mau tinh',
+        $r['status'] === 200 && !str_contains($r['body'], 'iPhone 15 Pro Max'));
+    $r = requestHtml($base, $adminCookie, '/index.php?khu=admin&act=danhmuc',
+        ['hanh_dong' => 'them', 'ten_danhmuc' => 'Admin Test Category']);
+    $adminDm = $dm->selectOne('SELECT id FROM danhmuc WHERE ten_danhmuc = ?', ['Admin Test Category']);
+    check('HTTP admin tao danh muc dung ten cot Model', $r['status'] === 200 && $adminDm !== null
+        && str_contains($r['body'], 'Admin Test Category'));
+    $r = requestHtml($base, $adminCookie, '/index.php?khu=admin&act=themsanpham', [
+        'ma_sp' => 'ADMIN-UI', 'ten_sp' => 'Admin UI Product', 'id_danhmuc' => (string) $adminDm['id'],
+        'gia' => '1250000', 'so_luong_goc' => '5', 'so_luong_ton' => '5',
+    ]);
+    $adminSp = $sp->layTheoMa('ADMIN-UI');
+    check('HTTP admin tao san pham va cap nhat danh sach tu CSDL',
+        $r['status'] === 200 && $adminSp !== null && str_contains($r['body'], 'Admin UI Product'));
+    $r = requestHtml($base, $adminCookie, '/index.php?khu=admin&act=themnhanvien', [
+        'ho_ten' => 'Admin UI Staff', 'email' => 'admin-ui@test.local', 'mat_khau' => 'test-pass', 'vai_tro' => 'NhanVien',
+    ]);
+    check('HTTP admin tao nhan vien dung ten truong Model',
+        $r['status'] === 200 && str_contains($r['body'], 'admin-ui@test.local'));
+    $r = requestHtml($base, $adminCookie, '/index.php?khu=admin&act=themvoucher', [
+        'ma_code' => 'ADMINUI', 'loai' => 'tien', 'gia_tri' => '10000', 'so_luong' => '5',
+        'ngay_bd' => date('Y-m-d'), 'ngay_kt' => date('Y-m-d', strtotime('+7 days')), 'hang_ap_dung' => '',
+    ]);
+    check('HTTP admin tao voucher tu form va hien du lieu that',
+        $r['status'] === 200 && str_contains($r['body'], 'ADMINUI'));
+    $r = requestHtml($base, $adminCookie, '/index.php?khu=admin&act=themkhuyenmai', [
+        'ten_km' => 'Admin UI Sale', 'loai' => 'sanpham', 'id_sanpham' => (string) $adminSp['id'],
+        'phan_tram' => '10', 'ngay_bd' => date('Y-m-d'), 'ngay_kt' => date('Y-m-d', strtotime('+7 days')),
+    ]);
+    check('HTTP admin tao khuyen mai dung ten truong Model',
+        $r['status'] === 200 && str_contains($r['body'], 'Admin UI Sale'));
+    $r = requestHtml($base, $adminCookie, '/index.php?khu=admin&act=doanhthu&ky=nam');
+    check('HTTP admin cac bao cao render tu du lieu truy van', $r['status'] === 200
+        && str_contains($r['body'], 'Thống kê doanh thu') && !str_contains($r['body'], '458.750.000'));
+    $r = requestHtml($base, $adminCookie, '/index.php?khu=admin&act=dangxuat');
+    check('HTTP admin dang xuat quay ve cong dang nhap', $r['status'] === 302 && str_contains($r['location'], 'dangnhap'));
 } catch (Throwable $e) {
     check('Test khong bi gian doan', false, $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
 } finally {

@@ -128,5 +128,5 @@ if (-not (Test-LocalPort $WebPort)) {
 } else {
     Write-Output "Cong $WebPort dang mo. Kiem tra day dung la server cua du an."
 }
-Write-Output "Mo http://localhost:$WebPort/"
+Write-Output "Mo http://127.0.0.1:$WebPort/"
 Write-Output "CSDL: $($taskDbConfig.dbname), MySQL port $($taskDbConfig.port)"

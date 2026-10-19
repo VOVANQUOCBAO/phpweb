@@ -19,19 +19,19 @@
                                 Tài khoản của bạn đã bị quản trị viên khóa do vi phạm chính sách hoặc bom hàng/trả hàng. Vui lòng liên hệ hotline 1800.6868.
                             </div>
                         </div>
-                    <?php elseif (isset($error_msg)): ?>
+                    <?php elseif (!empty($loi)): ?>
                         <div class="alert alert-danger rounded-3 small">
-                            <i class="fas fa-exclamation-circle me-1"></i> <?=$error_msg?>
+                            <i class="fas fa-exclamation-circle me-1"></i> <?=htmlspecialchars((string) $loi, ENT_QUOTES, 'UTF-8')?>
                         </div>
                     <?php endif; ?>
 
                     <!-- Form Đăng nhập -->
                     <form action="index.php?act=dangnhap" method="POST">
                         <div class="mb-3">
-                            <label class="form-label fw-semibold small">Tên đăng nhập hoặc Email</label>
+                            <label class="form-label fw-semibold small">Email</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light"><i class="fas fa-user text-muted"></i></span>
-                                <input type="text" name="username" class="form-control" placeholder="nguyenvana hoặc email" required>
+                                <input type="email" name="email" class="form-control" placeholder="email@example.com" required>
                             </div>
                         </div>
 
@@ -42,7 +42,7 @@
                             </div>
                             <div class="input-group">
                                 <span class="input-group-text bg-light"><i class="fas fa-lock text-muted"></i></span>
-                                <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+                                <input type="password" name="mat_khau" class="form-control" placeholder="••••••••" required>
                             </div>
                         </div>
 
@@ -70,4 +70,3 @@
         </div>
     </div>
 </div>
-

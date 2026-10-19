@@ -30,6 +30,7 @@ if ($act === 'dangnhap') {
         }
         $kq = $admin->dangNhap($email, $pass);
         if ($kq['ok']) {
+            session_regenerate_id(true);
             $nv = $kq['nhanvien'];
             $nv['hoten'] = $nv['ho_ten'] ?? 'Quản Trị Viên';
             $_SESSION['admin'] = $nv;

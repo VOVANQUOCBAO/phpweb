@@ -63,7 +63,12 @@ try {
                 if (!isset($payload['ngay_sinh']) && isset($payload['ngaysinh'])) {
                     $payload['ngay_sinh'] = $payload['ngaysinh'];
                 }
-                $kq = $khModel->themKhachHang($payload);
+                if (isset($payload['re_password'])
+                    && !hash_equals((string) ($payload['mat_khau'] ?? ''), (string) $payload['re_password'])) {
+                    $kq = ['ok' => false, 'loi' => 'Mat khau nhap lai khong khop'];
+                } else {
+                    $kq = $khModel->themKhachHang($payload);
+                }
                 if ($kq['ok']) {
                     $thongBao = 'Dang ky thanh cong, vui long dang nhap';
                     $ctrl->render('dangky.php', compact('thongBao', 'loi') + ['act' => $act]);

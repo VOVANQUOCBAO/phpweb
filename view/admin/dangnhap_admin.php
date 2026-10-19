@@ -1,8 +1,8 @@
 <?php
 // Đường dẫn tương đối
 $admin_base_url = file_exists('../css/theme.css') ? '../' : (file_exists('view/css/theme.css') ? 'view/' : '../../view/');
-$admin_ctrl_url = file_exists('index.php') ? 'index.php' : '../../controller/admin/index.php';
-$user_home_url = file_exists('../../index.php') ? '../../index.php' : '../index.php';
+$admin_ctrl_url = 'index.php?khu=admin';
+$user_home_url = 'index.php';
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -49,7 +49,9 @@ $user_home_url = file_exists('../../index.php') ? '../../index.php' : '../index.
 
                     <div class="card-body p-4 p-md-5">
                         <!-- Thông báo nếu nhân viên bị khóa tài khoản [12/5] -->
-                        <?php if (isset($_GET['error']) && $_GET['error'] == 'locked'): ?>
+                        <?php if (!empty($loi)): ?>
+                            <div class="alert alert-danger rounded-3 small mb-4"><?=htmlspecialchars((string) $loi, ENT_QUOTES, 'UTF-8')?></div>
+                        <?php elseif (isset($_GET['error']) && $_GET['error'] == 'locked'): ?>
                             <div class="alert alert-danger rounded-3 small d-flex align-items-center gap-2 mb-4">
                                 <i class="fas fa-user-lock fs-4"></i>
                                 <div>
@@ -63,7 +65,7 @@ $user_home_url = file_exists('../../index.php') ? '../../index.php' : '../index.
                             </div>
                         <?php endif; ?>
 
-                        <form action="<?=$admin_ctrl_url?>?act=dangnhap" method="POST">
+                        <form action="<?=$admin_ctrl_url?>&amp;act=dangnhap" method="POST">
                             <div class="mb-3">
                                 <label class="form-label fw-semibold small text-dark">Mã Nhân Viên / Tên Đăng Nhập</label>
                                 <div class="input-group">
@@ -76,7 +78,7 @@ $user_home_url = file_exists('../../index.php') ? '../../index.php' : '../index.
                                 <label class="form-label fw-semibold small text-dark">Mật Khẩu Quản Trị</label>
                                 <div class="input-group">
                                     <span class="input-group-text bg-light"><i class="fas fa-key text-muted"></i></span>
-                                    <input type="password" name="admin_pass" class="form-control" placeholder="••••••••" value="123456" required>
+                                    <input type="password" name="admin_pass" class="form-control" placeholder="••••••••" value="password" required>
                                 </div>
                             </div>
 
@@ -98,4 +100,3 @@ $user_home_url = file_exists('../../index.php') ? '../../index.php' : '../index.
     </div>
 </body>
 </html>
-
