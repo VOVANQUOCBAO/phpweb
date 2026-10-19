@@ -6,7 +6,13 @@ class danhmuc extends xl_database
 {
     public function layDS(): array
     {
-        return $this->select('SELECT * FROM danhmuc ORDER BY ten_danhmuc');
+        return $this->select(
+            'SELECT dm.*, COUNT(DISTINCT sp.id) AS so_san_pham
+             FROM danhmuc dm
+             LEFT JOIN sanpham sp ON sp.id_danhmuc = dm.id
+             GROUP BY dm.id
+             ORDER BY dm.ten_danhmuc'
+        );
     }
 
     public function layTheoId(int $id): ?array
@@ -16,9 +22,9 @@ class danhmuc extends xl_database
 
     public function them(string $ten, ?string $moTa = null): int
     {
-        $ten = trim($ten);
-        if ($ten === '') {
-            throw new InvalidArgumentException('Ten danh muc khong duoc rong');
+        [$ten, $moTa] = $this->kiemTraDuLieu($ten, $moTa);
+        if ($this->selectOne('SELECT id FROM danhmuc WHERE ten_danhmuc = ?', [$ten]) !== null) {
+            throw new InvalidArgumentException('Tên danh mục đã tồn tại');
         }
         return $this->insert('danhmuc', [
             'ten_danhmuc' => $ten,
@@ -28,9 +34,15 @@ class danhmuc extends xl_database
 
     public function sua(int $id, string $ten, ?string $moTa = null): int
     {
-        $ten = trim($ten);
-        if ($ten === '') {
-            throw new InvalidArgumentException('Ten danh muc khong duoc rong');
+        if ($id < 1 || $this->layTheoId($id) === null) {
+            throw new InvalidArgumentException('Không tìm thấy danh mục');
+        }
+        [$ten, $moTa] = $this->kiemTraDuLieu($ten, $moTa);
+        if ($this->selectOne(
+            'SELECT id FROM danhmuc WHERE ten_danhmuc = ? AND id <> ?',
+            [$ten, $id]
+        ) !== null) {
+            throw new InvalidArgumentException('Tên danh mục đã tồn tại');
         }
         return $this->update('danhmuc', [
             'ten_danhmuc' => $ten,
@@ -40,12 +52,45 @@ class danhmuc extends xl_database
 
     public function xoa(int $id): array
     {
-        $conSp = $this->selectOne('SELECT COUNT(*) AS c FROM sanpham WHERE id_danhmuc = ?', [$id]);
-        if ((int) ($conSp['c'] ?? 0) > 0) {
-            return ['ok' => false, 'loi' => 'Khong the xoa danh muc van con san pham'];
+        if ($id < 1) {
+            return ['ok' => false, 'loi' => 'Mã danh mục không hợp lệ'];
         }
-        $this->delete('khuyenmai', 'id_danhmuc = ?', [$id]);
-        $this->delete('danhmuc', 'id = ?', [$id]);
-        return ['ok' => true];
+        try {
+            $this->begin();
+            if ($this->selectOne('SELECT id FROM danhmuc WHERE id = ? FOR UPDATE', [$id]) === null) {
+                $this->rollback();
+                return ['ok' => false, 'loi' => 'Không tìm thấy danh mục'];
+            }
+            $conSp = $this->selectOne('SELECT COUNT(*) AS c FROM sanpham WHERE id_danhmuc = ?', [$id]);
+            if ((int) ($conSp['c'] ?? 0) > 0) {
+                $this->rollback();
+                return ['ok' => false, 'loi' => 'Không thể xóa danh mục đang có sản phẩm'];
+            }
+            $conKm = $this->selectOne('SELECT COUNT(*) AS c FROM khuyenmai WHERE id_danhmuc = ?', [$id]);
+            if ((int) ($conKm['c'] ?? 0) > 0) {
+                $this->rollback();
+                return ['ok' => false, 'loi' => 'Không thể xóa danh mục đang được áp dụng khuyến mãi'];
+            }
+            $this->delete('danhmuc', 'id = ?', [$id]);
+            $this->commit();
+            return ['ok' => true];
+        } catch (Throwable $e) {
+            $this->rollback();
+            error_log('Xoa danh muc: ' . $e->getMessage());
+            return ['ok' => false, 'loi' => 'Không thể xóa danh mục lúc này'];
+        }
+    }
+
+    private function kiemTraDuLieu(string $ten, ?string $moTa): array
+    {
+        $ten = trim($ten);
+        $moTa = $moTa !== null ? trim($moTa) : null;
+        if ($ten === '' || strlen($ten) > 600) {
+            throw new InvalidArgumentException('Tên danh mục bắt buộc và không quá 150 ký tự');
+        }
+        if ($moTa !== null && $moTa === '') {
+            $moTa = null;
+        }
+        return [$ten, $moTa];
     }
 }

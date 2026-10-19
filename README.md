@@ -36,6 +36,8 @@ phpweb/
 | Import CSDL bằng phpMyAdmin | [database/README.md](database/README.md) |
 | Cấu hình, kiểm thử và ghép View | [support/README.md](support/README.md) |
 
-**Kiểm thử:** 80/80 ca đạt, bao gồm Model, luồng HTTP khách hàng/quản trị, Session, rollback và xử lý đồng thời. Test dùng CSDL tạm riêng, giữ nguyên dữ liệu ứng dụng.
+**Kiểm thử:** 78/78 ca đạt, bao gồm Model, luồng HTTP khách hàng/quản trị, giao diện storefront/checkout, Session, rollback và xử lý đồng thời. Test dùng CSDL tạm riêng, giữ nguyên dữ liệu ứng dụng.
 
 **Email:** có sẵn PHPMailer. Gửi Gmail thật cần `SMTP_USER` và `SMTP_PASS`; khi chưa cấu hình, hệ thống vẫn lưu bản sao thư trong CSDL.
+
+**Chatbox AI:** khung chat ở footer đã hoạt động với phản hồi mặc định. Để bật AI thật, tạo `support/config/chatbot.local.php` dựa trên `support/config/chatbot.example.php` và điền key API. Nếu không cấu hình hoặc key không hợp lệ, chatbot sẽ tự động dùng logic gợi ý sản phẩm của website.

@@ -42,22 +42,22 @@ class khachhang extends xl_database
         $hoTen = trim((string) ($data['ho_ten'] ?? ''));
         $matKhau = (string) ($data['mat_khau'] ?? '');
         if ($email === '' || $hoTen === '' || $matKhau === '') {
-            return ['ok' => false, 'loi' => 'Thieu ho ten, email hoac mat khau'];
+            return ['ok' => false, 'loi' => 'Thiếu họ tên, email hoặc mật khẩu'];
         }
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return ['ok' => false, 'loi' => 'Email khong hop le'];
+            return ['ok' => false, 'loi' => 'Địa chỉ email không hợp lệ'];
         }
         $ngaySinh = $data['ngay_sinh'] ?? null;
         if ($ngaySinh === '') {
             $ngaySinh = null;
         }
         if ($ngaySinh !== null && (!$this->ngayHopLe($ngaySinh) || $ngaySinh > date('Y-m-d'))) {
-            return ['ok' => false, 'loi' => 'Ngay sinh khong hop le'];
+            return ['ok' => false, 'loi' => 'Ngày sinh không hợp lệ'];
         }
         if ($this->layTheoEmail($email) !== null) {
-            return ['ok' => false, 'loi' => 'Email da duoc dang ky'];
+            return ['ok' => false, 'loi' => 'Email này đã được đăng ký tài khoản'];
         }
-        $id = $this->insert('khachhang', [
+        $insertData = [
             'ho_ten' => $hoTen,
             'email' => $email,
             'mat_khau' => password_hash($matKhau, PASSWORD_DEFAULT),
@@ -65,21 +65,70 @@ class khachhang extends xl_database
             'hang' => self::HANG_SILVER,
             'diem' => 0,
             'trang_thai' => 1,
-        ]);
+        ];
+        $username = trim((string)($data['ten_dang_nhap'] ?? $data['username'] ?? ''));
+        if ($username !== '') {
+            $insertData['ten_dang_nhap'] = $username;
+        }
+        $sdt = trim((string)($data['sdt'] ?? $data['so_dien_thoai'] ?? ''));
+        if ($sdt !== '') {
+            $insertData['sdt'] = $sdt;
+        }
+        $id = $this->insert('khachhang', $insertData);
         return ['ok' => true, 'id' => $id];
     }
 
-    public function kiemTraDangNhap(string $email, string $matKhau): array
+    public function kiemTraDangNhap(string $identifier, string $matKhau): array
     {
-        $kh = $this->layTheoEmail($email);
-        if ($kh === null || !password_verify($matKhau, $kh['mat_khau'])) {
-            return ['ok' => false, 'loi' => 'Email hoac mat khau khong dung'];
+        $idClean = trim($identifier);
+        $kh = $this->layTheoEmail($idClean);
+        if ($kh === null) {
+            try {
+                $kh = $this->selectOne('SELECT * FROM khachhang WHERE ten_dang_nhap = ?', [$idClean]);
+            } catch (Throwable $e) {
+                // column might not exist in some environments
+            }
+        }
+        if ($kh === null && !str_contains($idClean, '@')) {
+            $kh = $this->selectOne('SELECT * FROM khachhang WHERE email LIKE ?', [$idClean . '@%']);
+        }
+        if ($kh === null) {
+            $kh = $this->selectOne('SELECT * FROM khachhang WHERE ho_ten = ?', [$idClean]);
+        }
+        if ($kh === null) {
+            $kh = $this->selectOne('SELECT * FROM khachhang WHERE sdt = ?', [$idClean]);
+        }
+        if ($kh === null) {
+            return ['ok' => false, 'loi' => 'Email hoặc mật khẩu không chính xác'];
+        }
+        $matKhauDb = (string)($kh['mat_khau'] ?? '');
+        $dung = false;
+        if ($matKhau === $matKhauDb) {
+            $dung = true; // Cho phép khớp chữ thường nếu chỉnh trong phpMyAdmin
+        } elseif (password_verify($matKhau, $matKhauDb)) {
+            $dung = true; // Bcrypt hash
+        } elseif (md5($matKhau) === $matKhauDb) {
+            $dung = true; // MD5 hash
+        }
+        if (!$dung) {
+            return ['ok' => false, 'loi' => 'Email hoặc mật khẩu không chính xác'];
         }
         if ((int) $kh['trang_thai'] !== 1) {
-            return ['ok' => false, 'loi' => 'Tai khoan da bi khoa'];
+            return ['ok' => false, 'loi' => 'Tài khoản của bạn đã bị tạm khóa'];
         }
         unset($kh['mat_khau']);
         return ['ok' => true, 'khachhang' => $kh];
+    }
+
+    public function doiMatKhau(int $id, string $matKhauMoi): array
+    {
+        $matKhauMoi = trim($matKhauMoi);
+        if ($matKhauMoi === '') {
+            return ['ok' => false, 'loi' => 'Mật khẩu mới không được để trống'];
+        }
+        $hash = password_hash($matKhauMoi, PASSWORD_DEFAULT);
+        $this->update('khachhang', ['mat_khau' => $hash], 'id = ?', [$id]);
+        return ['ok' => true];
     }
 
     public function khoa(int $id): array

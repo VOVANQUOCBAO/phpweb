@@ -22,7 +22,7 @@ class admin_controller
     {
         $sp = new sanpham();
         return [
-            'ds_sanpham' => $sp->layDS(),
+            'ds_sanpham' => $sp->layDSAdmin(),
             'ds_danhmuc' => (new danhmuc())->layDS(),
             'sap_het' => $sp->canhBaoSapHet(5),
             'hang_e' => $sp->hangE(),
@@ -48,16 +48,30 @@ class admin_controller
     public function xuLyDanhMuc(string $hanhDong, array $data): array
     {
         $dm = new danhmuc();
-        if ($hanhDong === 'them') {
-            $id = $dm->them((string) ($data['ten_danhmuc'] ?? ''), $data['mo_ta'] ?? null);
-            return ['ok' => true, 'id' => $id];
-        }
-        if ($hanhDong === 'sua') {
-            $dm->sua((int) $data['id'], (string) $data['ten_danhmuc'], $data['mo_ta'] ?? null);
-            return ['ok' => true];
-        }
-        if ($hanhDong === 'xoa') {
-            return $dm->xoa((int) $data['id']);
+        try {
+            if ($hanhDong === 'them') {
+                $id = $dm->them(
+                    (string) ($data['ten_danhmuc'] ?? ''),
+                    isset($data['mo_ta']) ? (string) $data['mo_ta'] : null
+                );
+                return ['ok' => true, 'id' => $id];
+            }
+            if ($hanhDong === 'sua') {
+                $dm->sua(
+                    (int) ($data['id'] ?? 0),
+                    (string) ($data['ten_danhmuc'] ?? ''),
+                    isset($data['mo_ta']) ? (string) $data['mo_ta'] : null
+                );
+                return ['ok' => true];
+            }
+            if ($hanhDong === 'xoa') {
+                return $dm->xoa((int) ($data['id'] ?? 0));
+            }
+        } catch (InvalidArgumentException $e) {
+            return ['ok' => false, 'loi' => $e->getMessage()];
+        } catch (Throwable $e) {
+            error_log('Xu ly danh muc: ' . $e->getMessage());
+            return ['ok' => false, 'loi' => 'Không thể lưu danh mục lúc này'];
         }
         return ['ok' => false, 'loi' => 'Hanh dong danh muc khong hop le'];
     }
@@ -174,5 +188,43 @@ class admin_controller
     public function doanhThu(string $ky = 'thang'): array
     {
         return (new donhang())->thongKeDoanhThu($ky);
+    }
+
+    public function trangGiaoDien(): array
+    {
+        $file = dirname(__DIR__, 2) . '/support/config/theme.json';
+        $cfg = ['season' => 'default', 'font' => 'font-segoe', 'bg' => 'bg-light-gray'];
+        if (is_file($file)) {
+            $saved = json_decode((string)file_get_contents($file), true);
+            if (is_array($saved)) {
+                $cfg = array_merge($cfg, $saved);
+            }
+        }
+        return ['theme' => $cfg];
+    }
+
+    public function luuGiaoDien(array $data): array
+    {
+        $validSeasons = ['default', 'theme-spring', 'theme-summer', 'theme-autumn', 'theme-winter'];
+        $validFonts = ['font-segoe', 'font-bevietnam', 'font-roboto', 'font-montserrat'];
+        $validBgs = ['bg-light-gray', 'bg-white-pure', 'bg-soft-blue'];
+
+        $season = in_array($data['season'] ?? '', $validSeasons, true) ? $data['season'] : 'default';
+        $font = in_array($data['font'] ?? '', $validFonts, true) ? $data['font'] : 'font-segoe';
+        $bg = in_array($data['bg'] ?? '', $validBgs, true) ? $data['bg'] : 'bg-light-gray';
+
+        $cfg = [
+            'season' => $season,
+            'font' => $font,
+            'bg' => $bg,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ];
+
+        $dir = dirname(__DIR__, 2) . '/support/config';
+        if (!is_dir($dir)) {
+            mkdir($dir, 0777, true);
+        }
+        file_put_contents($dir . '/theme.json', json_encode($cfg, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        return ['ok' => true, 'theme' => $cfg];
     }
 }

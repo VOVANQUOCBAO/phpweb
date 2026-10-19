@@ -140,8 +140,14 @@ if (!empty($chitiet) && is_array($chitiet)) {
     $sp['price_new'] = number_format((float)($chitiet['gia_km'] ?? $chitiet['gia']), 0, ',', '.');
     $sp['price_num'] = (float)($chitiet['gia_km'] ?? $chitiet['gia']);
     $sp['stock'] = (int)$chitiet['so_luong_ton'];
+    $sp['sold'] = (int)($chitiet['da_ban'] ?? 0);
+    $sp['rating'] = number_format((float)($chitiet['sao_tb'] ?? 5.0), 1);
+    $sp['total_reviews'] = (int)($chitiet['so_danh_gia'] ?? 0);
     if (!empty($chitiet['hinh'])) {
         $sp['image'] = $chitiet['hinh'];
+    }
+    if (!empty($chitiet['mo_ta'])) {
+        $sp['desc'] = $chitiet['mo_ta'];
     }
 }
 ?>
@@ -179,12 +185,12 @@ if (!empty($chitiet) && is_array($chitiet)) {
             <h2 class="fw-bold text-dark mb-2"><?=htmlspecialchars($sp['name'])?></h2>
             
             <div class="d-flex flex-wrap align-items-center gap-3 mb-3 small">
-                <span class="text-warning">⭐⭐⭐⭐⭐ <strong>(<?=$sp['rating']?>.0)</strong></span>
-                <span class="text-muted border-start ps-3">Đã bán: <strong><?=$sp['sold']?></strong></span>
+                <span class="text-warning">⭐⭐⭐⭐⭐ <strong>(<?=$sp['rating']?>/5)</strong> <span class="text-secondary">(<?=$sp['total_reviews']?> đánh giá)</span></span>
+                <span class="text-muted border-start ps-3">Đã bán: <strong><?=number_format($sp['sold'])?></strong></span>
                 <?php if ($sp['stock'] > 0): ?>
-                    <span class="text-success border-start ps-3 fw-bold"><i class="fas fa-check-circle me-1"></i> Còn hàng (Tồn kho: <?=$sp['stock']?>)</span>
+                    <span class="text-success border-start ps-3 fw-bold"><i class="fas fa-check-circle me-1"></i> Còn hàng (Tồn kho: <strong><?=$sp['stock']?></strong>)</span>
                 <?php else: ?>
-                    <span class="text-danger border-start ps-3 fw-bold"><i class="fas fa-times-circle me-1"></i> Hết hàng</span>
+                    <span class="text-danger border-start ps-3 fw-bold"><i class="fas fa-times-circle me-1"></i> Hết hàng (Tồn kho: 0)</span>
                 <?php endif; ?>
             </div>
 

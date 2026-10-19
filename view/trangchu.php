@@ -1,84 +1,252 @@
 <?php
-$h = static fn(mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
-$imageUrl = static function (?string $source): string {
-    $source = trim((string) $source);
-    if ($source === '') {
-        return '../view/image/Nen VHU.jpg';
+// Xác định đường dẫn tương đối tới ảnh tùy theo ngữ cảnh gọi view
+if (!isset($img_path)) {
+    if (file_exists('view/image/iphone 15 pro max.jpeg')) {
+        $img_path = 'view/image/';
+    } elseif (file_exists('../view/image/iphone 15 pro max.jpeg')) {
+        $img_path = '../view/image/';
+    } else {
+        $img_path = 'view/image/';
     }
-    if (str_starts_with($source, '/') || preg_match('~^(?:https?:)?//~i', $source)) {
-        return $source;
-    }
-    return '../view/image/' . rawurlencode(basename(str_replace('\\', '/', $source)));
-};
-$renderProducts = static function (array $products) use ($h, $imageUrl): void {
-    if ($products === []) {
-        echo '<p class="text-muted">Chưa có sản phẩm phù hợp.</p>';
-        return;
-    }
-    echo '<div class="row g-3">';
-    foreach ($products as $sp) {
-        $id = (int) $sp['id'];
-        $name = $h($sp['ten_sp']);
-        $price = (float) ($sp['gia_km'] ?? $sp['gia']);
-        $original = (float) ($sp['gia_goc'] ?? $sp['gia']);
-        $outOfStock = (int) ($sp['so_luong_ton'] ?? 0) <= 0;
-        echo '<div class="col-12 col-sm-6 col-lg-3"><article class="card h-100 shadow-sm">';
-        echo '<a href="index.php?act=chitiet&amp;id=' . $id . '"><img class="card-img-top p-3" style="height:210px;object-fit:contain" src="' . $h($imageUrl($sp['hinh'] ?? null)) . '" alt="' . $name . '"></a>';
-        echo '<div class="card-body d-flex flex-column"><a class="h6 text-decoration-none" href="index.php?act=chitiet&amp;id=' . $id . '">' . $name . '</a>';
-        echo '<p class="small text-muted mb-2">' . $h($sp['ma_sp']) . ' · Tồn: ' . (int) ($sp['so_luong_ton'] ?? 0) . '</p>';
-        echo '<div class="mt-auto">';
-        if ($price < $original) {
-            echo '<div class="small text-muted text-decoration-line-through">' . number_format($original, 0, ',', '.') . 'đ</div>';
+}
+
+// Hàm hiển thị Card Sản phẩm từ DỮ LIỆU THẬT trong CSDL
+if (!function_exists('renderCardTrangChu')) {
+    function renderCardTrangChu(array $sp, string $img_path, string $badgeType = ''): void {
+        $id = (int)$sp['id'];
+        $ten = htmlspecialchars($sp['ten_sp']);
+        $hinh = !empty($sp['hinh']) ? $img_path . $sp['hinh'] : $img_path . 'iphone 15 pro max.jpeg';
+        $giaGoc = (float)($sp['gia_goc'] ?? $sp['gia']);
+        $giaKm = (float)($sp['gia_km'] ?? $sp['gia']);
+        $tonKho = (int)($sp['so_luong_ton'] ?? 0);
+        $daBan = (int)($sp['da_ban'] ?? 0);
+        $saoTb = number_format((float)($sp['sao_tb'] ?? 5.0), 1);
+        $tongDg = (int)($sp['so_danh_gia'] ?? 0);
+        $hetHang = $tonKho <= 0 || !empty($sp['het_hang']);
+
+        // % giảm giá
+        $phanTramGiam = 0;
+        if ($giaGoc > $giaKm) {
+            $phanTramGiam = round((($giaGoc - $giaKm) / $giaGoc) * 100);
         }
-        echo '<strong class="text-danger">' . number_format($price, 0, ',', '.') . 'đ</strong></div></div>';
-        echo '<div class="card-footer bg-white d-flex gap-2"><a class="btn btn-outline-primary btn-sm flex-fill" href="index.php?act=chitiet&amp;id=' . $id . '">Chi tiết</a>';
-        if ($outOfStock) {
-            echo '<button class="btn btn-secondary btn-sm flex-fill" disabled>Hết hàng</button>';
-        } else {
-            echo '<a class="btn btn-primary btn-sm flex-fill" href="index.php?act=themgiohang&amp;id=' . $id . '">Thêm giỏ</a>';
-        }
-        echo '</div></article></div>';
-    }
-    echo '</div>';
-};
 ?>
-<main class="container py-4">
-    <section class="p-4 p-md-5 mb-4 rounded-4 bg-primary text-white">
-        <h1 class="display-6 fw-bold">Điện thoại chính hãng</h1>
-        <p class="mb-0">Sản phẩm, giá và tình trạng tồn kho được lấy trực tiếp từ cơ sở dữ liệu.</p>
-    </section>
+        <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+            <div class="card h-100 product-card shadow-sm <?=$hetHang ? 'out-of-stock' : ''?>">
+                <?php if ($hetHang): ?>
+                    <span class="badge product-badge badge-tag-stock"><i class="fas fa-ban me-1"></i> Hết hàng</span>
+                <?php elseif ($phanTramGiam > 0): ?>
+                    <span class="badge product-badge badge-tag-sale"><i class="fas fa-bolt me-1"></i> -<?=$phanTramGiam?>%</span>
+                <?php elseif ($badgeType === 'new'): ?>
+                    <span class="badge product-badge badge-tag-new"><i class="fas fa-sparkles me-1"></i> Mới</span>
+                <?php elseif ($daBan > 0): ?>
+                    <span class="badge product-badge badge-tag-hot"><i class="fas fa-fire me-1"></i> Bán Chạy</span>
+                <?php endif; ?>
 
-    <form action="index.php" method="get" class="card card-body mb-4">
-        <input type="hidden" name="act" value="trangchu">
-        <div class="row g-2">
-            <div class="col-md-5"><label class="visually-hidden" for="searchProducts">Tìm sản phẩm</label><input id="searchProducts" class="form-control" name="q" value="<?=$h($tuKhoa ?? '')?>" placeholder="Tên, mã sản phẩm"></div>
-            <div class="col-md-3"><label class="visually-hidden" for="categoryFilter">Danh mục</label><select id="categoryFilter" class="form-select" name="id_danhmuc"><option value="">Tất cả danh mục</option><?php foreach ($ds_danhmuc as $dm): ?><option value="<?=$h($dm['id'])?>" <?=((int)($idDm ?? 0) === (int)$dm['id']) ? 'selected' : ''?>><?=$h($dm['ten_danhmuc'])?></option><?php endforeach; ?></select></div>
-            <div class="col-md-2"><label class="visually-hidden" for="sortProducts">Sắp xếp</label><select id="sortProducts" class="form-select" name="sapxep"><option value="moi" <?=($sapXep ?? 'moi') === 'moi' ? 'selected' : ''?>>Mới nhất</option><option value="cu" <?=($sapXep ?? '') === 'cu' ? 'selected' : ''?>>Cũ nhất</option></select></div>
-            <div class="col-md-2"><button class="btn btn-primary w-100">Tìm kiếm</button></div>
+                <a href="index.php?act=chitiet&id=<?=$id?>" class="product-img-wrapper">
+                    <img src="<?=$hinh?>" alt="<?=$ten?>">
+                </a>
+                <div class="card-body p-3 d-flex flex-column">
+                    <a href="index.php?act=chitiet&id=<?=$id?>" class="product-title" title="<?=$ten?>"><?=$ten?></a>
+                    
+                    <div class="d-flex justify-content-between align-items-center mb-2 small text-muted">
+                        <span class="text-warning">
+                            ⭐⭐⭐⭐⭐ <small class="text-secondary">(<?=$saoTb?>/5 - <?=$tongDg?> ĐG)</small>
+                        </span>
+                        <span>Đã bán: <strong class="text-dark"><?=number_format($daBan)?></strong></span>
+                    </div>
+
+                    <p class="mb-2 small text-secondary">
+                        Tồn kho: 
+                        <?php if ($hetHang): ?>
+                            <span class="fw-bold text-danger">0 (Hết hàng)</span>
+                        <?php else: ?>
+                            <span class="fw-bold text-success"><?=$tonKho?></span>
+                        <?php endif; ?>
+                    </p>
+
+                    <div class="mt-auto pt-2">
+                        <?php if ($phanTramGiam > 0): ?>
+                            <div class="text-muted text-decoration-line-through small"><?=number_format($giaGoc, 0, ',', '.')?>đ</div>
+                            <div class="text-danger fw-bold fs-5"><?=number_format($giaKm, 0, ',', '.')?>đ</div>
+                        <?php else: ?>
+                            <div class="text-danger fw-bold fs-5"><?=number_format($giaGoc, 0, ',', '.')?>đ</div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent border-0 p-3 pt-0">
+                    <?php if ($hetHang): ?>
+                        <button class="btn btn-secondary w-100 fw-bold rounded-3 py-2 disabled" style="cursor: not-allowed;" title="Sản phẩm tạm hết hàng">
+                            <i class="fas fa-times-circle me-1"></i> Tạm hết hàng
+                        </button>
+                    <?php else: ?>
+                        <a href="index.php?act=themgiohang&id=<?=$id?>&tensp=<?=urlencode($sp['ten_sp'])?>&dongia=<?=$giaKm?>&hinh=<?=urlencode($sp['hinh'] ?? '')?>" 
+                           class="btn-add-cart text-decoration-none" 
+                           data-id="<?=$id?>" data-name="<?=$ten?>" data-price="<?=$giaKm?>" data-img="<?=htmlspecialchars($sp['hinh'] ?? '')?>">
+                            <i class="fas fa-cart-plus me-1"></i> Thêm vào giỏ
+                        </a>
+                    <?php endif; ?>
+                </div>
+            </div>
         </div>
-    </form>
+<?php
+    }
+}
+?>
 
-    <?php if ($sp_km !== []): ?>
-        <section class="mb-5">
-            <h2 class="h4 mb-3">Khuyến mãi đang áp dụng</h2>
-            <?php $renderProducts($sp_km); ?>
-        </section>
+<!-- ========================================================
+     1. BANNER TRƯỢT TOÀN MÀN HÌNH (CAROUSEL FULL-WIDTH)
+     ======================================================== -->
+<div id="heroCarousel" class="carousel slide carousel-fullwidth" data-bs-ride="carousel" data-bs-interval="4000">
+    <div class="carousel-indicators">
+        <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Slide 1"></button>
+        <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="1" aria-label="Slide 2"></button>
+        <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="2" aria-label="Slide 3"></button>
+    </div>
+    <div class="carousel-inner">
+        <!-- Banner 1 -->
+        <div class="carousel-item active">
+            <a href="index.php?act=chitiet&id=1">
+                <img src="<?=$img_path?>banner_iphone16.svg" class="d-block w-100" alt="iPhone 16 Pro Max">
+            </a>
+        </div>
+        <!-- Banner 2 -->
+        <div class="carousel-item">
+            <a href="index.php?act=chitiet&id=3">
+                <img src="<?=$img_path?>banner_s24.svg" class="d-block w-100" alt="Samsung Galaxy S24 Ultra">
+            </a>
+        </div>
+        <!-- Banner 3 -->
+        <div class="carousel-item">
+            <a href="index.php?act=chitiet&id=4">
+                <img src="<?=$img_path?>banner_xiaomi.svg" class="d-block w-100" alt="Xiaomi 14 Ultra Leica">
+            </a>
+        </div>
+    </div>
+    <button class="carousel-control-prev" type="button" data-bs-target="#heroCarousel" data-bs-slide="prev">
+        <span class="carousel-control-prev-icon p-3 bg-dark bg-opacity-50 rounded-circle" aria-hidden="true"></span>
+        <span class="visually-hidden">Trước</span>
+    </button>
+    <button class="carousel-control-next" type="button" data-bs-target="#heroCarousel" data-bs-slide="next">
+        <span class="carousel-control-next-icon p-3 bg-dark bg-opacity-50 rounded-circle" aria-hidden="true"></span>
+        <span class="visually-hidden">Sau</span>
+    </button>
+</div>
+
+<!-- ========================================================
+     KHU VỰC CHÍNH (CONTAINER)
+     ======================================================== -->
+<div class="container mb-5">
+
+    <!-- THANH BỘ LỌC NHANH & SẮP XẾP SẢN PHẨM TỪ CSDL -->
+    <div class="bg-white p-3 rounded-4 shadow-sm mb-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <!-- Lọc theo danh mục thực tế từ bảng danhmuc -->
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <span class="fw-bold small text-muted"><i class="fas fa-filter text-primary me-1"></i> Danh mục:</span>
+            <a href="index.php?act=trangchu" class="btn btn-outline-primary btn-sm rounded-pill px-3 <?=empty($idDm) ? 'active' : ''?>">Tất cả</a>
+            <?php foreach (($ds_danhmuc ?? []) as $dm): ?>
+                <a href="index.php?act=trangchu&id_danhmuc=<?=$dm['id']?>" class="btn btn-outline-primary btn-sm rounded-pill px-3 <?=(($idDm ?? 0) == $dm['id']) ? 'active' : ''?>">
+                    <?=htmlspecialchars($dm['ten_danhmuc'])?>
+                </a>
+            <?php endforeach; ?>
+            <a href="#block-khuyenmai" class="btn btn-outline-danger btn-sm rounded-pill px-3"><i class="fas fa-bolt me-1"></i> Khuyến mãi HOT</a>
+        </div>
+
+        <!-- Bộ lọc sắp xếp -->
+        <div class="d-flex align-items-center gap-2">
+            <span class="fw-bold small text-muted"><i class="fas fa-sort-amount-down me-1"></i> Sắp xếp:</span>
+            <select class="form-select form-select-sm rounded-pill" style="width: auto;" onchange="location.href='index.php?act=trangchu<?=!empty($idDm) ? '&id_danhmuc='.$idDm : ''?>&sort='+this.value">
+                <option value="moi" <?=($sapXep ?? '') !== 'cu' ? 'selected' : ''?>>Mới nhất → Cũ nhất</option>
+                <option value="cu" <?=($sapXep ?? '') === 'cu' ? 'selected' : ''?>>Cũ nhất → Mới nhất</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- ========================================================
+         KHỐI NỔI BẬT 1: 🔥 SẢN PHẨM KHUYẾN MÃI HOT (DỮ LIỆU THẬT CSDL)
+         ======================================================== -->
+    <?php if (!empty($sp_km)): ?>
+    <section id="block-khuyenmai" class="highlight-section mb-5 p-4 border-blue">
+        <div class="section-title-wrap">
+            <h2 class="section-title text-danger">
+                <span>🔥 SẢN PHẨM KHUYẾN MÃI HOT</span>
+                <span class="badge bg-danger fs-6 text-white text-uppercase py-1 px-2 ms-2">Giảm Giá Sốc</span>
+            </h2>
+            <span class="small text-muted"><i class="fas fa-check-circle text-success me-1"></i> Dữ liệu thật từ CSDL</span>
+        </div>
+
+        <div class="row g-4">
+            <?php foreach ($sp_km as $sp): ?>
+                <?php renderCardTrangChu($sp, $img_path, 'sale'); ?>
+            <?php endforeach; ?>
+        </div>
+    </section>
     <?php endif; ?>
 
-    <section class="mb-5">
-        <h2 class="h4 mb-3">Sản phẩm mới</h2>
-        <?php $renderProducts($sp_moi); ?>
-    </section>
-
-    <section class="mb-5">
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-            <h2 class="h4 mb-0"><?=!empty($tuKhoa) ? 'Kết quả tìm kiếm' : 'Tất cả sản phẩm'?></h2>
-            <span class="text-muted small">Tổng <?=$h($tong_sanpham ?? count($ds_sanpham))?> sản phẩm</span>
+    <!-- ========================================================
+         KHỐI NỔI BẬT 2: ✨ SẢN PHẨM MỚI RA MẮT (DỮ LIỆU THẬT CSDL)
+         ======================================================== -->
+    <?php if (!empty($sp_moi)): ?>
+    <section id="block-spmoi" class="highlight-section mb-5 p-4 border-blue">
+        <div class="section-title-wrap">
+            <h2 class="section-title text-primary">
+                <span>✨ SẢN PHẨM MỚI VỀ HÀNG</span>
+                <span class="badge bg-primary fs-6 text-white text-uppercase py-1 px-2 ms-2">Mới Nhất</span>
+            </h2>
+            <span class="small text-muted"><i class="fas fa-boxes text-primary me-1"></i> Tồn kho thật theo CSDL</span>
         </div>
-        <?php $renderProducts($ds_sanpham); ?>
+
+        <div class="row g-4">
+            <?php foreach ($sp_moi as $sp): ?>
+                <?php renderCardTrangChu($sp, $img_path, 'new'); ?>
+            <?php endforeach; ?>
+        </div>
+    </section>
+    <?php endif; ?>
+
+    <!-- ========================================================
+         KHỐI 3: 📱 TẤT CẢ SẢN PHẨM / TÌM KIẾM / DANH MỤC (DỮ LIỆU THẬT CSDL)
+         ======================================================== -->
+    <section id="block-tatca" class="mb-5 bg-white p-4 rounded-4 shadow-sm">
+        <div class="section-title-wrap">
+            <h2 class="section-title">
+                <i class="fas fa-mobile-alt text-primary me-2"></i>
+                <?php if (!empty($tuKhoa)): ?>
+                    Kết quả tìm kiếm cho: "<?=htmlspecialchars($tuKhoa)?>"
+                <?php elseif (!empty($idDm)): ?>
+                    Danh mục sản phẩm đã chọn
+                <?php else: ?>
+                    Tất Cả Sản Phẩm Chính Hãng
+                <?php endif; ?>
+                <span class="badge bg-secondary fs-6 ms-2"><?=count($ds_sanpham)?> sản phẩm</span>
+            </h2>
+            <span class="badge bg-success-subtle text-success border border-success px-3 py-2">
+                <i class="fas fa-database me-1"></i> Số sao, Đã bán, Tồn kho lấy từ CSDL
+            </span>
+        </div>
+
+        <div class="row g-4">
+            <?php if (!empty($ds_sanpham)): ?>
+                <?php foreach ($ds_sanpham as $sp): ?>
+                    <?php renderCardTrangChu($sp, $img_path); ?>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div class="col-12 text-center py-5">
+                    <i class="fas fa-box-open fs-1 text-muted mb-3 d-block"></i>
+                    <h5 class="text-muted">Không tìm thấy sản phẩm nào trong hệ thống!</h5>
+                    <a href="index.php?act=trangchu" class="btn btn-primary rounded-pill px-4 mt-2">Xem tất cả sản phẩm</a>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- Phân trang / Xem thêm -->
         <?php if (!empty($con_tiep)): ?>
-            <?php $nextQuery = ['act' => 'trangchu', 'q' => $tuKhoa ?? '', 'id_danhmuc' => $idDm ?? '', 'sapxep' => $sapXep ?? 'moi', 'trang' => (int)($trang ?? 1) + 1, 'moi_trang' => $moi_trang ?? 12]; ?>
-            <div class="text-center mt-4"><a class="btn btn-outline-primary" href="index.php?<?=http_build_query($nextQuery)?>">Xem thêm</a></div>
+            <div class="text-center mt-4">
+                <a href="index.php?act=trangchu&trang=<?=($trang + 1)?><?=!empty($idDm) ? '&id_danhmuc='.$idDm : ''?><?=!empty($tuKhoa) ? '&q='.urlencode($tuKhoa) : ''?>" 
+                   class="btn btn-outline-primary rounded-pill px-4 py-2 fw-semibold">
+                    <i class="fas fa-chevron-circle-down me-1"></i> Xem thêm sản phẩm tiếp theo
+                </a>
+            </div>
         <?php endif; ?>
     </section>
-</main>
+
+</div>

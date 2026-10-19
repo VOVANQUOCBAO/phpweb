@@ -58,35 +58,44 @@ switch ($act) {
         break;
 
     case 'themsanpham':
-        $kq = $admin->themSanPham($_POST);
+        $kq = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
+            ? (!empty($_POST['id'])
+                ? $admin->suaSanPham((int) $_POST['id'], $_POST)
+                : $admin->themSanPham($_POST))
+            : ['ok' => false, 'loi' => 'Thao tác sản phẩm phải gửi bằng POST'];
         $loi = $kq['ok'] ? null : $kq['loi'];
-        $thongBao = $kq['ok'] ? 'Da them san pham' : null;
+        $thongBao = $kq['ok'] ? (!empty($_POST['id']) ? 'Đã cập nhật sản phẩm' : 'Đã thêm sản phẩm') : null;
         $data = $admin->trangSanPham();
         $ctrl->render('admin/sanpham.php', $data + compact('thongBao', 'loi') + ['act' => 'sanpham']);
         break;
 
     case 'suasanpham':
-        $kq = $admin->suaSanPham((int) ($_POST['id'] ?? 0), $_POST);
+        $kq = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
+            ? $admin->suaSanPham((int) ($_POST['id'] ?? 0), $_POST)
+            : ['ok' => false, 'loi' => 'Thao tác sản phẩm phải gửi bằng POST'];
         $loi = $kq['ok'] ? null : $kq['loi'];
-        $thongBao = $kq['ok'] ? 'Da sua san pham' : null;
+        $thongBao = $kq['ok'] ? 'Đã cập nhật sản phẩm' : null;
         $data = $admin->trangSanPham();
         $ctrl->render('admin/sanpham.php', $data + compact('thongBao', 'loi') + ['act' => 'sanpham']);
         break;
 
     case 'xoasanpham':
-        $kq = $admin->xoaSanPham((int) ($_GET['id'] ?? $_POST['id'] ?? 0));
+        $kq = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
+            ? $admin->xoaSanPham((int) ($_POST['id'] ?? 0))
+            : ['ok' => false, 'loi' => 'Thao tác sản phẩm phải gửi bằng POST'];
         $loi = $kq['ok'] ? null : $kq['loi'];
-        $thongBao = $kq['ok'] ? 'Da xoa san pham' : null;
+        $thongBao = $kq['ok'] ? 'Đã xóa sản phẩm' : null;
         $data = $admin->trangSanPham();
         $ctrl->render('admin/sanpham.php', $data + compact('thongBao', 'loi') + ['act' => 'sanpham']);
         break;
 
     case 'danhmuc':
     case 'themdanhmuc':
-        $hanhDong = $_POST['hanh_dong'] ?? $_GET['hanh_dong'] ?? 'them';
-        $kq = $admin->xuLyDanhMuc($hanhDong, $_POST + $_GET);
+        $kq = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
+            ? $admin->xuLyDanhMuc((string) ($_POST['hanh_dong'] ?? 'them'), $_POST)
+            : ['ok' => false, 'loi' => 'Thao tác danh mục phải gửi bằng POST'];
         $loi = $kq['ok'] ? null : ($kq['loi'] ?? null);
-        $thongBao = $kq['ok'] ? 'Da cap nhat danh muc' : null;
+        $thongBao = $kq['ok'] ? 'Đã lưu thay đổi danh mục' : null;
         $data = $admin->trangSanPham();
         $ctrl->render('admin/sanpham.php', $data + compact('thongBao', 'loi') + ['act' => 'sanpham']);
         break;
@@ -213,6 +222,43 @@ switch ($act) {
         $ky = $_GET['ky'] ?? 'thang';
         $data = $admin->doanhThu($ky);
         $ctrl->render('admin/doanhthu.php', $data + compact('thongBao', 'loi', 'ky') + ['act' => $act]);
+        break;
+
+    case 'giaodien':
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+            $kq = $admin->luuGiaoDien($_POST);
+            $thongBao = 'Đã lưu và áp dụng cấu hình giao diện cho toàn hệ thống thành công!';
+        }
+        $data = $admin->trangGiaoDien();
+        $ctrl->render('admin/giaodien.php', $data + compact('thongBao', 'loi') + ['act' => 'giaodien']);
+        break;
+
+    case 'doimatkhau':
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+            $matKhauMoi = trim((string)($_POST['mat_khau_moi'] ?? ''));
+            $xacNhan = trim((string)($_POST['xac_nhan_mat_khau'] ?? ''));
+            if ($matKhauMoi === '') {
+                $loi = 'Vui lòng nhập mật khẩu mới.';
+            } elseif ($matKhauMoi !== $xacNhan) {
+                $loi = 'Xác nhận mật khẩu mới không khớp.';
+            } else {
+                $nvModel = new nhanvien();
+                $adminId = (int)($_SESSION['admin']['id'] ?? 1);
+                $kq = $nvModel->doiMatKhau($adminId, $matKhauMoi);
+                if ($kq['ok']) {
+                    // Đồng bộ sang bảng khachhang cho tài khoản admin
+                    $khModel = new khachhang();
+                    $khAdmin = $khModel->selectOne("SELECT id FROM khachhang WHERE ten_dang_nhap = 'admin' OR email = 'admin@local.test'");
+                    if ($khAdmin) {
+                        $khModel->doiMatKhau((int)$khAdmin['id'], $matKhauMoi);
+                    }
+                    $thongBao = 'Đổi mật khẩu Quản Trị Viên thành công! Mật khẩu mới đã được cập nhật đồng bộ trong CSDL.';
+                } else {
+                    $loi = $kq['loi'];
+                }
+            }
+        }
+        $ctrl->render('admin/doimatkhau.php', compact('thongBao', 'loi') + ['act' => 'doimatkhau']);
         break;
 
     default:

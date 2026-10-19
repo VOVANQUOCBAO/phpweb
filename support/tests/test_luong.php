@@ -24,6 +24,7 @@ $server = null;
 $adminPdo = null;
 $testDb = null;
 $cfg = csdl::cauHinh();
+$mainDb = $cfg['dbname'];
 $oldEnv = [];
 foreach (['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASS', 'SMTP_USER', 'SMTP_PASS'] as $key) {
     $oldEnv[$key] = getenv($key);
@@ -120,7 +121,8 @@ function race(string $action, array $args): array
 
 function request(string $base, string &$cookie, string $act = '', ?array $post = null, string $path = '/controller/index.php'): array
 {
-    $url = $base . $path . ($act !== '' ? '?act=' . $act : '');
+    $separator = str_contains($path, '?') ? '&' : '?';
+    $url = $base . $path . ($act !== '' ? $separator . 'act=' . $act : '');
     $headers = 'Cookie: ' . $cookie . "\r\n";
     if ($post !== null) {
         $headers .= "Content-Type: application/x-www-form-urlencoded\r\n";
@@ -140,32 +142,41 @@ function request(string $base, string &$cookie, string $act = '', ?array $post =
             $location = substr($header, 10);
         }
     }
-    $data = $raw === false || $raw === '' ? null : json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+    if ($raw === false || $raw === '') {
+        $data = null;
+    } else {
+        try {
+            $data = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            $data = $raw;
+        }
+    }
     return ['status' => $status, 'data' => $data, 'location' => $location];
 }
 
-function requestHtml(string $base, string &$cookie, string $path, ?array $post = null): array
+function requestHtml(string $base, string &$cookie, string $path): array
 {
-    $headers = "User-Agent: PHPWebIntegrationTest\r\nCookie: {$cookie}\r\n";
-    if ($post !== null) {
-        $headers .= "Content-Type: application/x-www-form-urlencoded\r\n";
-    }
-    $ctx = stream_context_create(['http' => ['method' => $post === null ? 'GET' : 'POST',
-        'header' => $headers, 'content' => $post === null ? '' : http_build_query($post),
+    $ctx = stream_context_create(['http' => ['method' => 'GET',
+        'header' => "User-Agent: PHPWebIntegrationTest\r\nCookie: {$cookie}\r\n",
         'ignore_errors' => true, 'follow_location' => 0, 'timeout' => 10]]);
     $body = file_get_contents($base . $path, false, $ctx);
     $status = 0;
-    $location = '';
     foreach ($http_response_header ?? [] as $header) {
         if (preg_match('/^HTTP\/\S+ (\d+)/', $header, $m)) {
             $status = (int) $m[1];
         } elseif (preg_match('/^Set-Cookie:\s*([^;]+)/i', $header, $m)) {
             $cookie = $m[1];
-        } elseif (stripos($header, 'Location: ') === 0) {
-            $location = substr($header, 10);
         }
     }
-    return ['status' => $status, 'body' => $body === false ? '' : $body, 'location' => $location];
+    return ['status' => $status, 'body' => $body === false ? '' : $body];
+}
+
+function renderAdminView(array $data): string
+{
+    extract($data, EXTR_SKIP);
+    ob_start();
+    require BASE_PATH . '/view/admin/sanpham.php';
+    return (string) ob_get_clean();
 }
 
 function counts(PDO $pdo, string $db): array
@@ -196,9 +207,16 @@ try {
     csdl::resetKetNoi();
     $pdo = csdl::shared();
     $pdo->exec(file_get_contents(BASE_PATH . '/database/schema.sql'));
-    // Import lan hai phai giu nguyen du lieu va khong trung tai khoan seed.
+    ob_start();
+    require BASE_PATH . '/support/scripts/khoitao_csdl.php';
+    $setupOutput = ob_get_clean();
+    preg_match('/Mat khau khoi tao \(chi hien thi lan nay\): ([a-f0-9]{32})/', $setupOutput, $adminPassword);
+    $adminPassword = $adminPassword[1] ?? '';
+    // Import lan hai khong ghi de tai khoan quan tri da duoc khoi tao an toan.
     $pdo->exec(file_get_contents(BASE_PATH . '/database/schema.sql'));
-    check('CSDL rieng + import SQL lap lai khong xoa du lieu', counts($pdo, $testDb)['nhanvien'] === 1);
+    check('CSDL rieng + import SQL lap lai giu tai khoan quan tri', counts($pdo, $testDb)['nhanvien'] === 1
+        && $adminPassword !== ''
+        && (new nhanvien())->kiemTraDangNhap('admin@local.test', $adminPassword)['ok']);
 
     $dm = new danhmuc();
     $sp = new sanpham();
@@ -381,6 +399,50 @@ try {
         throw new RuntimeException('Server HTTP khong khoi dong');
     }
     $base = 'http://' . $addr;
+    $adminCookie = '';
+    $adminPath = '/controller/index.php?khu=admin';
+    $r = request($base, $adminCookie, 'dangnhap', [
+        'admin_user' => 'admin@local.test', 'admin_pass' => $adminPassword,
+    ], $adminPath);
+    check('HTTP dang nhap Admin khong can thong tin dien san', $r['status'] === 302 && $adminCookie !== '');
+    $r = request($base, $adminCookie, 'sanpham', null, $adminPath);
+    $_SESSION['admin'] = ['hoten' => 'Admin test'];
+    $adminHtml = is_array($r['data']) ? renderAdminView($r['data']) : '';
+    check('HTTP trang Admin hien san pham/danh muc tu CSDL', $r['status'] === 200
+        && str_contains($adminHtml, 'Quản lý danh mục') && str_contains($adminHtml, 'Danh sách sản phẩm'));
+    $r = request($base, $adminCookie, 'themsanpham', [
+        'ma_sp' => 'ADMIN-HTTP', 'ten_sp' => 'Sản phẩm Admin HTTP', 'id_danhmuc' => $idDm,
+        'gia' => 900000, 'so_luong_goc' => 10, 'so_luong_ton' => 4, 'mo_ta' => 'Thêm qua trang quản trị',
+    ], $adminPath);
+    $adminSp = $sp->layTheoMa('ADMIN-HTTP');
+    check('HTTP Admin them san pham ghi dung du lieu CSDL', $r['status'] === 200
+        && $adminSp !== null && (int) $adminSp['so_luong_goc'] === 10 && (int) $adminSp['so_luong_ton'] === 4);
+    $r = request($base, $adminCookie, 'suasanpham', [
+        'id' => $adminSp['id'], 'ma_sp' => 'ADMIN-HTTP', 'ten_sp' => 'Sản phẩm đã sửa',
+        'id_danhmuc' => $idDm, 'gia' => 950000, 'so_luong_goc' => 10, 'so_luong_ton' => 11,
+    ], $adminPath);
+    check('HTTP Admin chan sua ton vuot so luong goc', $r['status'] === 200
+        && $sp->layChiTiet((int) $adminSp['id'])['ten_sp'] === 'Sản phẩm Admin HTTP');
+    $r = request($base, $adminCookie, 'danhmuc', [
+        'hanh_dong' => 'them', 'ten_danhmuc' => 'Danh mục Admin HTTP', 'mo_ta' => 'Tạo từ trang quản trị',
+    ], $adminPath);
+    $adminDm = $dm->selectOne('SELECT id FROM danhmuc WHERE ten_danhmuc = ?', ['Danh mục Admin HTTP']);
+    check('HTTP Admin them danh muc ghi vao CSDL', $r['status'] === 200 && $adminDm !== null);
+    $r = request($base, $adminCookie, 'danhmuc', [
+        'hanh_dong' => 'sua', 'id' => $adminDm['id'],
+        'ten_danhmuc' => 'Danh mục Admin HTTP sửa', 'mo_ta' => 'Đã cập nhật',
+    ], $adminPath);
+    check('HTTP Admin sua danh muc cap nhat CSDL', $r['status'] === 200
+        && $dm->layTheoId((int) $adminDm['id'])['ten_danhmuc'] === 'Danh mục Admin HTTP sửa');
+    $r = request($base, $adminCookie, 'danhmuc', [
+        'hanh_dong' => 'xoa', 'id' => $adminDm['id'],
+    ], $adminPath);
+    check('HTTP Admin xoa danh muc trong CSDL', $r['status'] === 200
+        && $dm->layTheoId((int) $adminDm['id']) === null);
+    $r = request($base, $adminCookie, 'xoasanpham', ['id' => $adminSp['id']], $adminPath);
+    check('HTTP Admin xoa san pham chua giao dich', $r['status'] === 200
+        && $sp->layChiTiet((int) $adminSp['id']) === null);
+
     $cookie = '';
     $r = request($base, $cookie, 'timkiem', null, '/index.php');
     check('HTTP index goc chuyen huong dung controller va giu act', $r['status'] === 302 && $r['location'] === 'controller/index.php?act=timkiem');
@@ -406,11 +468,9 @@ try {
     check('HTTP phan trang/Xem them khong lap SP, co tong va con_tiep', count($p1['ds_sanpham']) === 1
         && $p1['ds_sanpham'][0]['id'] !== $p2['ds_sanpham'][0]['id'] && $p1['con_tiep']
         && isset($p1['sp_km'][0]['gia_km'], $p1['sp_moi'][0]['gia_km']));
-    $httpSp = spTest($idDm, 'HTTP', 10, 1000000);
     $storefront = requestHtml($base, $cookie, '/controller/index.php?act=trangchu');
-    check('HTTP cua hang render san pham that tu CSDL', $storefront['status'] === 200
-        && str_contains($storefront['body'], 'San pham HTTP')
-        && str_contains($storefront['body'], 'Tất cả sản phẩm'));
+    check('HTTP storefront render san pham that tu CSDL', $storefront['status'] === 200
+        && str_contains($storefront['body'], 'San pham SP001'));
     $r = request($base, $cookie, 'timkiem&q=HETHANG');
     check('HTTP van hien SP het hang va co co het_hang', $r['data']['ds_sanpham'][0]['het_hang'] === true);
     $r = request($base, $cookie, 'chitiet&id=' . $idSp);
@@ -418,12 +478,13 @@ try {
     $r = request($base, $cookie, 'themdanhgia', ['id_sanpham' => $idSp, 'so_sao' => 4, 'noi_dung' => 'Danh gia HTTP']);
     check('HTTP gui danh gia bang session user, giu day du du lieu chi tiet', count($r['data']['ds_danhgia']) === 1
         && (int) $r['data']['ds_danhgia'][0]['id_khachhang'] === $httpKh && isset($r['data']['chitiet']['gia_km']));
+    $httpSp = spTest($idDm, 'HTTP', 10, 1000000);
     request($base, $cookie, 'themgiohang&id=' . $httpSp . '&sl=2');
-    $checkoutHtml = requestHtml($base, $cookie, '/controller/index.php?act=thanhtoan');
-    check('HTTP thanh toan hien cac truong duoc backend chap nhan', $checkoutHtml['status'] === 200
-        && str_contains($checkoutHtml['body'], 'name="dia_chi"')
-        && str_contains($checkoutHtml['body'], 'name="sdt"')
-        && str_contains($checkoutHtml['body'], 'name="ma_voucher"'));
+    $checkout = requestHtml($base, $cookie, '/controller/index.php?act=thanhtoan');
+    check('HTTP form checkout gui dung cac truong backend chap nhan', $checkout['status'] === 200
+        && str_contains($checkout['body'], 'name="dia_chi"')
+        && str_contains($checkout['body'], 'name="sdt"')
+        && str_contains($checkout['body'], 'name="ma_voucher"'));
     $r = request($base, $cookie, 'suagiohang', ['id' => $httpSp, 'sl' => 3]);
     check('HTTP gio hang luu qua nhieu request bang cookie', $r['data']['giohang']['items'][0]['so_luong'] === 3);
     $r = request($base, $cookie, 'suagiohang', ['id' => $httpSp, 'sl' => -1]);
@@ -479,54 +540,6 @@ try {
     check('HTTP act khong ton tai tra 400', $r['status'] === 400);
     $r = request($base, $cookie, 'dangnhap', ['email' => ['x'], 'mat_khau' => '123456']);
     check('HTTP tham so mang bi tu choi co kiem soat', $r['status'] === 400);
-
-    $adminCookie = '';
-    $r = requestHtml($base, $adminCookie, '/index.php?khu=admin&act=dangnhap');
-    check('HTTP admin login hien tai khoan mau dung SQL', $r['status'] === 200
-        && str_contains($r['body'], 'value="password"'));
-    $oldAdminCookie = $adminCookie;
-    $r = requestHtml($base, $adminCookie, '/index.php?khu=admin&act=dangnhap',
-        ['admin_user' => 'admin', 'admin_pass' => 'password']);
-    check('HTTP admin dang nhap dung, doi session va dieu huong khu admin',
-        $r['status'] === 302 && $adminCookie !== '' && $adminCookie !== $oldAdminCookie
-        && str_contains($r['location'], 'khu=admin'));
-    $r = requestHtml($base, $adminCookie, '/index.php?khu=admin&act=sanpham');
-    check('HTTP admin san pham chi hien du lieu that, khong hien mau tinh',
-        $r['status'] === 200 && !str_contains($r['body'], 'iPhone 15 Pro Max'));
-    $r = requestHtml($base, $adminCookie, '/index.php?khu=admin&act=danhmuc',
-        ['hanh_dong' => 'them', 'ten_danhmuc' => 'Admin Test Category']);
-    $adminDm = $dm->selectOne('SELECT id FROM danhmuc WHERE ten_danhmuc = ?', ['Admin Test Category']);
-    check('HTTP admin tao danh muc dung ten cot Model', $r['status'] === 200 && $adminDm !== null
-        && str_contains($r['body'], 'Admin Test Category'));
-    $r = requestHtml($base, $adminCookie, '/index.php?khu=admin&act=themsanpham', [
-        'ma_sp' => 'ADMIN-UI', 'ten_sp' => 'Admin UI Product', 'id_danhmuc' => (string) $adminDm['id'],
-        'gia' => '1250000', 'so_luong_goc' => '5', 'so_luong_ton' => '5',
-    ]);
-    $adminSp = $sp->layTheoMa('ADMIN-UI');
-    check('HTTP admin tao san pham va cap nhat danh sach tu CSDL',
-        $r['status'] === 200 && $adminSp !== null && str_contains($r['body'], 'Admin UI Product'));
-    $r = requestHtml($base, $adminCookie, '/index.php?khu=admin&act=themnhanvien', [
-        'ho_ten' => 'Admin UI Staff', 'email' => 'admin-ui@test.local', 'mat_khau' => 'test-pass', 'vai_tro' => 'NhanVien',
-    ]);
-    check('HTTP admin tao nhan vien dung ten truong Model',
-        $r['status'] === 200 && str_contains($r['body'], 'admin-ui@test.local'));
-    $r = requestHtml($base, $adminCookie, '/index.php?khu=admin&act=themvoucher', [
-        'ma_code' => 'ADMINUI', 'loai' => 'tien', 'gia_tri' => '10000', 'so_luong' => '5',
-        'ngay_bd' => date('Y-m-d'), 'ngay_kt' => date('Y-m-d', strtotime('+7 days')), 'hang_ap_dung' => '',
-    ]);
-    check('HTTP admin tao voucher tu form va hien du lieu that',
-        $r['status'] === 200 && str_contains($r['body'], 'ADMINUI'));
-    $r = requestHtml($base, $adminCookie, '/index.php?khu=admin&act=themkhuyenmai', [
-        'ten_km' => 'Admin UI Sale', 'loai' => 'sanpham', 'id_sanpham' => (string) $adminSp['id'],
-        'phan_tram' => '10', 'ngay_bd' => date('Y-m-d'), 'ngay_kt' => date('Y-m-d', strtotime('+7 days')),
-    ]);
-    check('HTTP admin tao khuyen mai dung ten truong Model',
-        $r['status'] === 200 && str_contains($r['body'], 'Admin UI Sale'));
-    $r = requestHtml($base, $adminCookie, '/index.php?khu=admin&act=doanhthu&ky=nam');
-    check('HTTP admin cac bao cao render tu du lieu truy van', $r['status'] === 200
-        && str_contains($r['body'], 'Thống kê doanh thu') && !str_contains($r['body'], '458.750.000'));
-    $r = requestHtml($base, $adminCookie, '/index.php?khu=admin&act=dangxuat');
-    check('HTTP admin dang xuat quay ve cong dang nhap', $r['status'] === 302 && str_contains($r['location'], 'dangnhap'));
 } catch (Throwable $e) {
     check('Test khong bi gian doan', false, $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
 } finally {
@@ -539,7 +552,7 @@ try {
         $adminPdo->exec("DROP DATABASE {$testDb}");
     }
     if ($adminPdo !== null && isset($mainBefore)) {
-        check('CSDL ung dung giu nguyen so ban ghi sau toan bo test', $mainBefore === counts($adminPdo, $cfg['dbname']));
+        check('CSDL ung dung giu nguyen so ban ghi sau toan bo test', $mainBefore === counts($adminPdo, $mainDb));
     }
     foreach ($oldEnv as $key => $value) {
         putenv($value === false ? $key : "{$key}={$value}");

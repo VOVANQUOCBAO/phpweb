@@ -2,7 +2,9 @@
 
 ## Chạy dự án
 
-Từ thư mục gốc, nhấp đúp `setup.bat` rồi mở **http://127.0.0.1:8000/**. Dùng `127.0.0.1` để chắc chắn truy cập đúng PHP server của dự án, tránh trường hợp `localhost` trỏ tới một server khác. Script tự tìm XAMPP tại `C:\xampp`, `D:\xampp`, `D:\data` hoặc biến `XAMPP_PATH`, khởi tạo CSDL còn thiếu và chạy server PHP. Các tiến trình chạy nền; script in PID để có thể dừng bằng `Stop-Process -Id <PID>` khi xong.
+Từ thư mục gốc, nhấp đúp `setup.bat` rồi mở **http://127.0.0.1:8000/**. Dùng `127.0.0.1` để chắc chắn truy cập đúng PHP server của dự án, tránh trường hợp `localhost` trỏ tới một server khác. Script tự tìm XAMPP tại `C:\xampp`, `D:\xampp`, `D:\data` hoặc biến `XAMPP_PATH`, khởi tạo CSDL còn thiếu, thêm các cột khách hàng mới vào CSDL đã có mà không xóa dữ liệu, và chạy server PHP. Các tiến trình chạy nền; script in PID để có thể dừng bằng `Stop-Process -Id <PID>` khi xong.
+
+Khi tạo mới tài khoản quản trị, mật khẩu ngẫu nhiên chỉ được in một lần trong cửa sổ dòng lệnh. Hãy lưu lại; trang đăng nhập không điền sẵn thông tin tài khoản. Có thể đặt biến môi trường `ADMIN_INITIAL_PASSWORD` (ít nhất 12 ký tự) trước khi chạy setup để tự chọn hoặc đặt lại mật khẩu Admin. Nếu tài khoản Admin cũ đang dùng mật khẩu mặc định `123` hoặc `password`, setup sẽ đổi sang mật khẩu mới và in một lần.
 
 Nếu cần chỉ định thư mục hoặc cổng:
 

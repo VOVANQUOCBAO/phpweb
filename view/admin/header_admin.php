@@ -2,8 +2,7 @@
 // Tự động nhận diện đường dẫn tài nguyên tĩnh
 $admin_base_url = file_exists('../css/theme.css') ? '../' : (file_exists('view/css/theme.css') ? 'view/' : '../../view/');
 $admin_ctrl_url = 'index.php?khu=admin';
-$user_home_url = 'index.php';
-$e = static fn(mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+$user_home_url = 'index.php?act=trangchu';
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -74,19 +73,19 @@ $e = static fn(mixed $value): string => htmlspecialchars((string) $value, ENT_QU
             <li class="nav-header">Nghiệp vụ Hàng hóa</li>
             <!-- [A1] Sản phẩm & Danh mục -->
             <li class="nav-item">
-                <a href="<?=$admin_ctrl_url?>&amp;act=sanpham" class="nav-link <?=($_GET['act'] ?? '') == 'sanpham' ? 'active' : ''?>">
+                <a href="<?=$admin_ctrl_url?>&act=sanpham" class="nav-link <?=($_GET['act'] ?? '') == 'sanpham' ? 'active' : ''?>">
                     <i class="fas fa-boxes"></i> [A1] Quản lý Sản phẩm
                 </a>
             </li>
             <!-- [A6] Khuyến mãi & Hàng ế -->
             <li class="nav-item">
-                <a href="<?=$admin_ctrl_url?>&amp;act=khuyenmai" class="nav-link <?=($_GET['act'] ?? '') == 'khuyenmai' ? 'active' : ''?>">
+                <a href="<?=$admin_ctrl_url?>&act=khuyenmai" class="nav-link <?=($_GET['act'] ?? '') == 'khuyenmai' ? 'active' : ''?>">
                     <i class="fas fa-tags"></i> [A6] Khuyến mãi & Hàng ế
                 </a>
             </li>
             <!-- [A5] Voucher mã giảm giá -->
             <li class="nav-item">
-                <a href="<?=$admin_ctrl_url?>&amp;act=voucher" class="nav-link <?=($_GET['act'] ?? '') == 'voucher' ? 'active' : ''?>">
+                <a href="<?=$admin_ctrl_url?>&act=voucher" class="nav-link <?=($_GET['act'] ?? '') == 'voucher' ? 'active' : ''?>">
                     <i class="fas fa-ticket-alt"></i> [A5] Quản lý Voucher
                 </a>
             </li>
@@ -94,19 +93,19 @@ $e = static fn(mixed $value): string => htmlspecialchars((string) $value, ENT_QU
             <li class="nav-header">Khách hàng & Đơn hàng</li>
             <!-- [A7] Quản lý đơn hàng -->
             <li class="nav-item">
-                <a href="<?=$admin_ctrl_url?>&amp;act=donhang" class="nav-link <?=($_GET['act'] ?? '') == 'donhang' ? 'active' : ''?>">
+                <a href="<?=$admin_ctrl_url?>&act=donhang" class="nav-link <?=($_GET['act'] ?? '') == 'donhang' ? 'active' : ''?>">
                     <i class="fas fa-shipping-fast"></i> [A7] Quản lý Đơn hàng
                 </a>
             </li>
             <!-- [A4] Khách hàng & Bom hàng -->
             <li class="nav-item">
-                <a href="<?=$admin_ctrl_url?>&amp;act=khachhang" class="nav-link <?=($_GET['act'] ?? '') == 'khachhang' ? 'active' : ''?>">
+                <a href="<?=$admin_ctrl_url?>&act=khachhang" class="nav-link <?=($_GET['act'] ?? '') == 'khachhang' ? 'active' : ''?>">
                     <i class="fas fa-users"></i> [A4] Quản lý Khách hàng
                 </a>
             </li>
             <!-- [A3] Đánh giá & Khóa bình luận xấu -->
             <li class="nav-item">
-                <a href="<?=$admin_ctrl_url?>&amp;act=danhgia" class="nav-link <?=($_GET['act'] ?? '') == 'danhgia' ? 'active' : ''?>">
+                <a href="<?=$admin_ctrl_url?>&act=danhgia" class="nav-link <?=($_GET['act'] ?? '') == 'danhgia' ? 'active' : ''?>">
                     <i class="fas fa-star-half-alt"></i> [A3] Quản lý Đánh giá
                 </a>
             </li>
@@ -114,14 +113,26 @@ $e = static fn(mixed $value): string => htmlspecialchars((string) $value, ENT_QU
             <li class="nav-header">Hệ thống & Báo cáo</li>
             <!-- [A2] Quản lý nhân viên -->
             <li class="nav-item">
-                <a href="<?=$admin_ctrl_url?>&amp;act=nhanvien" class="nav-link <?=($_GET['act'] ?? '') == 'nhanvien' ? 'active' : ''?>">
+                <a href="<?=$admin_ctrl_url?>&act=nhanvien" class="nav-link <?=($_GET['act'] ?? '') == 'nhanvien' ? 'active' : ''?>">
                     <i class="fas fa-user-tie"></i> [A2] Quản lý Nhân viên
                 </a>
             </li>
             <!-- [A8] Thống kê doanh thu -->
             <li class="nav-item">
-                <a href="<?=$admin_ctrl_url?>&amp;act=doanhthu" class="nav-link <?=($_GET['act'] ?? '') == 'doanhthu' ? 'active' : ''?>">
+                <a href="<?=$admin_ctrl_url?>&act=doanhthu" class="nav-link <?=($_GET['act'] ?? '') == 'doanhthu' ? 'active' : ''?>">
                     <i class="fas fa-chart-line"></i> [A8] Thống kê Doanh thu
+                </a>
+            </li>
+            <!-- [A9] Cấu hình Giao diện: Mùa, Font, Nền -->
+            <li class="nav-item">
+                <a href="<?=$admin_ctrl_url?>&act=giaodien" class="nav-link <?=($_GET['act'] ?? '') == 'giaodien' ? 'active' : ''?>">
+                    <i class="fas fa-palette text-warning"></i> [A9] Giao diện (Mùa, Font, Nền)
+                </a>
+            </li>
+            <!-- [A10] Đổi mật khẩu Quản trị -->
+            <li class="nav-item">
+                <a href="<?=$admin_ctrl_url?>&act=doimatkhau" class="nav-link <?=($_GET['act'] ?? '') == 'doimatkhau' ? 'active' : ''?>">
+                    <i class="fas fa-key text-info"></i> [A10] Đổi Mật Khẩu Admin
                 </a>
             </li>
         </ul>
@@ -134,7 +145,7 @@ $e = static fn(mixed $value): string => htmlspecialchars((string) $value, ENT_QU
                         <i class="fas fa-user-check"></i>
                     </div>
                     <div>
-                        <div class="text-white small fw-bold"><?=$e($_SESSION['admin']['hoten'] ?? 'Quản Trị Viên')?></div>
+                        <div class="text-white small fw-bold"><?=$_SESSION['admin']['hoten'] ?? 'Quản Trị Viên'?></div>
                         <div class="text-success" style="font-size: 0.72rem;">● Đang online</div>
                     </div>
                 </div>
@@ -143,7 +154,7 @@ $e = static fn(mixed $value): string => htmlspecialchars((string) $value, ENT_QU
                 <a href="<?=$user_home_url?>" class="btn btn-outline-light btn-sm flex-fill" style="font-size: 0.75rem;" title="Xem trang chủ bán hàng">
                     <i class="fas fa-store me-1"></i> Xem Shop
                 </a>
-                <a href="<?=$admin_ctrl_url?>&amp;act=dangxuat" class="btn btn-danger btn-sm" style="font-size: 0.75rem;" title="Đăng xuất quản trị">
+                <a href="<?=$admin_ctrl_url?>&act=dangxuat" class="btn btn-danger btn-sm" style="font-size: 0.75rem;" title="Đăng xuất quản trị">
                     <i class="fas fa-sign-out-alt"></i>
                 </a>
             </div>
@@ -158,7 +169,10 @@ $e = static fn(mixed $value): string => htmlspecialchars((string) $value, ENT_QU
                 <span class="navbar-text fw-bold text-dark">
                     <i class="fas fa-desktop text-primary me-2"></i> Bảng Điều Khiển Hệ Thống Bán Điện Thoại MVC
                 </span>
-                <div class="d-flex align-items-center gap-3">
+                <div class="d-flex align-items-center gap-2">
+                    <a href="<?=$admin_ctrl_url?>&act=giaodien" class="btn btn-warning btn-sm rounded-pill px-3 fw-bold text-dark shadow-sm">
+                        <i class="fas fa-palette me-1 text-danger"></i> Đổi Giao Diện (Mùa/Font/Nền)
+                    </a>
                     <span class="badge bg-primary rounded-pill px-3 py-2">
                         <i class="fas fa-calendar-alt me-1"></i> <?=date('d/m/Y')?>
                     </span>
@@ -169,3 +183,4 @@ $e = static fn(mixed $value): string => htmlspecialchars((string) $value, ENT_QU
             </div>
         </nav>
         <div class="p-4">
+

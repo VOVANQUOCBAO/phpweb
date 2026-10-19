@@ -11,12 +11,126 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 
+if (!function_exists('chatbot_build_fallback_reply')) {
+    function chatbot_build_fallback_reply(string $message): string
+    {
+        $q = strtolower(trim($message));
+        if ($q === '') {
+            return 'Bạn chưa nhập câu hỏi cho AI. Hãy nêu nhu cầu tìm điện thoại, mức giá hoặc tính năng bạn muốn.';
+        }
+
+        if (str_contains($q, 'iphone') || str_contains($q, 'apple') || str_contains($q, '16') || str_contains($q, '15')) {
+            return "🔥 Gợi ý cho bạn dòng <strong>Apple iPhone</strong> đỉnh cao:<ul class='mb-2 ps-3 mt-1'><li><strong>iPhone 16 256GB</strong>: 28.990.000đ (Siêu phẩm mới nhất)</li><li><strong>iPhone 15 Pro Max 256GB</strong>: 29.990.000đ (Giảm 20%)</li><li><strong>iPhone 13 128GB</strong>: 13.990.000đ (Bán chạy, giá hời)</li></ul><a href='index.php?act=chitiet&id=1' class='btn btn-primary btn-sm rounded-pill text-white text-decoration-none'>Xem iPhone 15 Pro Max</a>";
+        }
+
+        if (str_contains($q, 'samsung') || str_contains($q, 's24') || str_contains($q, 'ai')) {
+            return "✨ Bạn đang quan tâm dòng <strong>Samsung Galaxy AI</strong>:<ul class='mb-2 ps-3 mt-1'><li><strong>Samsung Galaxy S24 Ultra 5G</strong>: 28.990.000đ (Quyền năng AI đỉnh cao, bút S-Pen, viền Titanium)</li></ul><a href='index.php?act=chitiet&id=2' class='btn btn-primary btn-sm rounded-pill text-white text-decoration-none'>Xem Galaxy S24 Ultra</a>";
+        }
+
+        if (str_contains($q, 'dưới 15') || str_contains($q, 'rẻ') || str_contains($q, 'sinh viên') || str_contains($q, '10 triệu')) {
+            return "💰 Phân khúc tầm trung giá tốt cho bạn:<ul class='mb-2 ps-3 mt-1'><li><strong>OPPO Reno11 F 5G</strong>: 8.990.000đ (Chuyên gia chân dung)</li><li><strong>iPhone 13 128GB</strong>: 13.990.000đ (Hiệu năng cực bền)</li></ul><a href='index.php?act=chitiet&id=4' class='btn btn-primary btn-sm rounded-pill text-white text-decoration-none'>Xem OPPO Reno11 F</a>";
+        }
+
+        if (str_contains($q, 'ảnh') || str_contains($q, 'chụp') || str_contains($q, 'leica') || str_contains($q, 'xiaomi')) {
+            return "📷 Siêu phẩm chụp ảnh chuyên nghiệp:<ul class='mb-2 ps-3 mt-1'><li><strong>Xiaomi 14 5G 256GB</strong>: 20.990.000đ (Ống kính huyền thoại Leica)</li><li><strong>Samsung S24 Ultra</strong>: Camera 200MP Zoom 100x</li></ul><a href='index.php?act=chitiet&id=3' class='btn btn-primary btn-sm rounded-pill text-white text-decoration-none'>Xem Xiaomi 14 Leica</a>";
+        }
+
+        return "Cảm ơn bạn đã nhắn! ĐiệnThoạiZ hiện đang có chương trình khuyến mãi lớn cho các dòng <strong>iPhone 16, Samsung Galaxy S24 Ultra, Xiaomi 14 và OPPO Reno11</strong>. Bạn có muốn xem danh sách ưu đãi hôm nay không?";
+    }
+}
+
+if (!function_exists('chatbot_call_api')) {
+    function chatbot_call_api(string $message, string $apiKey, string $apiUrl, string $model): ?string
+    {
+        if (!function_exists('curl_init') || $apiKey === '' || $apiUrl === '') {
+            return null;
+        }
+
+        $isGemini = stripos($apiUrl, 'googleapis.com') !== false || stripos($apiUrl, 'gemini') !== false;
+
+        if ($isGemini) {
+            $endpoint = rtrim($apiUrl, '/');
+            if (stripos($endpoint, '?') === false) {
+                $endpoint .= '?key=' . rawurlencode($apiKey);
+            } else {
+                $endpoint .= '&key=' . rawurlencode($apiKey);
+            }
+
+            $payload = [
+                'contents' => [
+                    [
+                        'parts' => [[ 'text' => $message ]],
+                    ],
+                ],
+            ];
+            $headers = ['Content-Type: application/json'];
+        } else {
+            $endpoint = $apiUrl;
+            $payload = [
+                'model' => $model !== '' ? $model : 'gpt-4o-mini',
+                'messages' => [[
+                    'role' => 'user',
+                    'content' => $message,
+                ]],
+                'temperature' => 0.7,
+            ];
+            $headers = [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $apiKey,
+            ];
+        }
+
+        $ch = curl_init($endpoint);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 10,
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($response === false || $httpCode >= 400) {
+            return null;
+        }
+
+        $decoded = json_decode($response, true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+
+        if ($isGemini) {
+            $text = $decoded['candidates'][0]['content']['parts'][0]['text'] ?? null;
+            return is_string($text) ? $text : null;
+        }
+
+        $text = $decoded['choices'][0]['message']['content'] ?? null;
+        if (is_array($text)) {
+            $text = implode('', array_map(static fn ($part) => is_array($part) ? ($part['text'] ?? '') : (string) $part, $text));
+        }
+
+        return is_string($text) ? $text : null;
+    }
+}
+
+// Bắt điều hướng khu vực Admin trực tiếp từ controller/index.php
+$khu = $_GET['khu'] ?? '';
+if ($khu === 'admin') {
+    require __DIR__ . '/admin/index.php';
+    return;
+}
+
 require_once BASE_PATH . '/controller/controller.php';
 require_once BASE_PATH . '/controller/giohang.php';
 require_once BASE_PATH . '/controller/xuly_email.php';
 require_once BASE_PATH . '/model/danhmuc.php';
 require_once BASE_PATH . '/model/sanpham.php';
 require_once BASE_PATH . '/model/khachhang.php';
+require_once BASE_PATH . '/model/nhanvien.php';
 require_once BASE_PATH . '/model/danhgia.php';
 require_once BASE_PATH . '/model/donhang.php';
 require_once BASE_PATH . '/model/chitietdonhang.php';
@@ -45,6 +159,7 @@ try {
     $dmModel = new danhmuc();
     $spModel = new sanpham();
     $khModel = new khachhang();
+    $nvModel = new nhanvien();
     $dgModel = new danhgia();
     $dhModel = new donhang();
     $kmModel = new khuyenmai();
@@ -54,6 +169,7 @@ try {
         case 'dangky':
             if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 $payload = $_POST;
+                $action = $payload['action'] ?? 'dangky';
                 if (!isset($payload['ho_ten']) && isset($payload['hoten'])) {
                     $payload['ho_ten'] = $payload['hoten'];
                 }
@@ -63,41 +179,160 @@ try {
                 if (!isset($payload['ngay_sinh']) && isset($payload['ngaysinh'])) {
                     $payload['ngay_sinh'] = $payload['ngaysinh'];
                 }
-                if (isset($payload['re_password'])
-                    && !hash_equals((string) ($payload['mat_khau'] ?? ''), (string) $payload['re_password'])) {
-                    $kq = ['ok' => false, 'loi' => 'Mat khau nhap lai khong khop'];
+
+                $email = trim((string)($payload['email'] ?? ''));
+                $hoTen = trim((string)($payload['ho_ten'] ?? ''));
+                $matKhau = (string)($payload['mat_khau'] ?? '');
+                $rePass = (string)($payload['re_password'] ?? $matKhau);
+
+                if ($matKhau !== $rePass) {
+                    $loi = 'Mật khẩu xác nhận không trùng khớp';
+                } elseif ($action === 'gui_otp') {
+                    // Bước 1: Gửi mã OTP xác thực Gmail thật
+                    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                        $loi = 'Địa chỉ email không hợp lệ';
+                    } elseif ($khModel->layTheoEmail($email) !== null) {
+                        $loi = 'Email này đã tồn tại trong hệ thống. Vui lòng đăng nhập hoặc dùng email khác';
+                    } else {
+                        $otp = (string)random_int(100000, 999999);
+                        $_SESSION['dangky_pending'] = [
+                            'otp' => $otp,
+                            'time' => time(),
+                            'payload' => $payload,
+                        ];
+                        // Gửi email thật qua PHPMailer / Gmail SMTP
+                        $mailRes = (new xuly_email())->guiOtp($email, $otp, $hoTen);
+                        if ($mailRes['ok']) {
+                            $thongBao = "Mã xác thực OTP đã được gửi đến hộp thư Gmail <strong>" . htmlspecialchars($email) . "</strong>! Vui lòng kiểm tra Hộp thư đến (hoặc Thư rác/Spam) để lấy mã.";
+                        } else {
+                            $thongBao = "Mã xác thực OTP của bạn là: <strong class='text-primary fs-5'>{$otp}</strong> (Hệ thống đã tạo mã. Bạn có thể cấu hình Gmail App Password trong support/config/smtp.local.php để gửi thẳng về hòm thư Gmail thật).";
+                        }
+                    }
+                } elseif ($action === 'xacnhan_otp') {
+                    // Bước 2: Xác nhận mã OTP
+                    $nhapOtp = trim((string)($payload['otp'] ?? ''));
+                    $pending = $_SESSION['dangky_pending'] ?? null;
+                    if ($pending === null || (time() - $pending['time']) > 900) {
+                        $loi = 'Mã xác thực OTP đã hết hạn (15 phút). Vui lòng yêu cầu gửi mã mới.';
+                    } elseif ($nhapOtp !== $pending['otp']) {
+                        $loi = 'Mã xác thực OTP không chính xác. Vui lòng kiểm tra lại.';
+                    } else {
+                        $kq = $khModel->themKhachHang($pending['payload']);
+                        if ($kq['ok']) {
+                            unset($_SESSION['dangky_pending']);
+                            (new xuly_email())->guiChaoMung($pending['payload']['email'], $pending['payload']['ho_ten'] ?? '');
+                            $thongBao = 'Đăng ký thành công tài khoản Gmail chính hãng! Vui lòng đăng nhập.';
+                            $ctrl->render('dangnhap.php', compact('thongBao', 'loi') + ['act' => 'dangnhap']);
+                            break;
+                        }
+                        $loi = $kq['loi'];
+                    }
                 } else {
+                    // Đăng ký trực tiếp (1 bước)
                     $kq = $khModel->themKhachHang($payload);
+                    if ($kq['ok']) {
+                        (new xuly_email())->guiChaoMung($payload['email'], $payload['ho_ten'] ?? '');
+                        $thongBao = 'Đăng ký thành công tài khoản ' . htmlspecialchars($payload['email']) . '! Dữ liệu đã được lưu vào CSDL (bảng khachhang). Vui lòng đăng nhập.';
+                        $ctrl->render('dangnhap.php', compact('thongBao', 'loi') + ['act' => 'dangnhap']);
+                        break;
+                    }
+                    $loi = $kq['loi'];
                 }
-                if ($kq['ok']) {
-                    $thongBao = 'Dang ky thanh cong, vui long dang nhap';
-                    $ctrl->render('dangky.php', compact('thongBao', 'loi') + ['act' => $act]);
-                    break;
-                }
-                $loi = $kq['loi'];
             }
             $ctrl->render('dangky.php', compact('thongBao', 'loi') + ['act' => $act]);
             break;
 
         case 'dangnhap':
             if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
-                $email = $_POST['email'] ?? $_POST['username'] ?? '';
-                $pass = $_POST['mat_khau'] ?? $_POST['password'] ?? '';
-                $kq = $khModel->kiemTraDangNhap($email, $pass);
-                if ($kq['ok']) {
-                    session_regenerate_id(true);
-                    $u = $kq['khachhang'];
-                    $u['hoten'] = $u['ho_ten'] ?? '';
-                    $_SESSION['user'] = $u;
-                    $ctrl->redirect('trangchu');
+                $email = trim((string)($_POST['email'] ?? $_POST['username'] ?? ''));
+                $pass = (string)($_POST['mat_khau'] ?? $_POST['password'] ?? '');
+
+                if ($email === '' || $pass === '') {
+                    $loi = 'Vui lòng nhập đầy đủ tên đăng nhập/email và mật khẩu.';
+                } else {
+                    // 1. Kiểm tra tài khoản Quản trị / Nhân viên trước (Đăng nhập chung giao diện)
+                    $kqAdmin = $nvModel->kiemTraDangNhap($email, $pass);
+                    if ($kqAdmin['ok']) {
+                        session_regenerate_id(true);
+                        $nv = $kqAdmin['nhanvien'];
+                        $nv['hoten'] = $nv['ho_ten'] ?? 'Quản Trị Viên';
+                        $_SESSION['admin'] = $nv;
+                        $ctrl->redirect('sanpham', [], 'admin');
+                        return;
+                    }
+
+                    // 2. Kiểm tra tài khoản Khách hàng
+                    $kqKhach = $khModel->kiemTraDangNhap($email, $pass);
+                    if ($kqKhach['ok']) {
+                        session_regenerate_id(true);
+                        $u = $kqKhach['khachhang'];
+                        $u['hoten'] = $u['ho_ten'] ?? '';
+                        // Nếu là tài khoản Admin (tên đăng nhập admin hoặc email admin@local.test)
+                        if (strtolower(trim($email)) === 'admin' 
+                            || strtolower(trim($u['email'] ?? '')) === 'admin@local.test' 
+                            || strtolower(trim($u['ten_dang_nhap'] ?? '')) === 'admin') {
+                            $adminNv = $nvModel->selectOne("SELECT * FROM nhanvien WHERE vai_tro = 'Admin' LIMIT 1");
+                            if ($adminNv) {
+                                unset($adminNv['mat_khau']);
+                                $adminNv['hoten'] = $adminNv['ho_ten'] ?? 'Quản Trị Viên';
+                                $_SESSION['admin'] = $adminNv;
+                            } else {
+                                $_SESSION['admin'] = [
+                                    'id' => $u['id'],
+                                    'ho_ten' => $u['ho_ten'],
+                                    'hoten' => $u['ho_ten'],
+                                    'email' => $u['email'],
+                                    'vai_tro' => 'Admin'
+                                ];
+                            }
+                            $ctrl->redirect('sanpham', [], 'admin');
+                            return;
+                        }
+                        $_SESSION['user'] = $u;
+                        $ctrl->redirect('trangchu');
+                        return;
+                    }
+
+                    $loi = 'Tài khoản hoặc mật khẩu không chính xác.';
                 }
-                $loi = $kq['loi'];
+            }
+            if (isset($_GET['loi_admin'])) {
+                $loi = 'Khu vực này yêu cầu đăng nhập bằng tài khoản Quản trị viên.';
+            }
+            if (isset($_GET['msg']) && $_GET['msg'] === 'registered') {
+                $thongBao = 'Đăng ký tài khoản thành công! Vui lòng đăng nhập để tiếp tục.';
             }
             $ctrl->render('dangnhap.php', compact('thongBao', 'loi') + ['act' => $act]);
             break;
 
+        case 'google_login':
+            $gEmail = trim((string)($_POST['google_email'] ?? $_GET['google_email'] ?? ''));
+            $gName = trim((string)($_POST['google_name'] ?? $_GET['google_name'] ?? ''));
+            if ($gEmail !== '' && filter_var($gEmail, FILTER_VALIDATE_EMAIL)) {
+                $kh = $khModel->layTheoEmail($gEmail);
+                if ($kh === null) {
+                    $khModel->themKhachHang([
+                        'ho_ten' => $gName ?: explode('@', $gEmail)[0],
+                        'email' => $gEmail,
+                        'mat_khau' => bin2hex(random_bytes(8)),
+                        'hang' => khachhang::HANG_SILVER,
+                    ]);
+                    $kh = $khModel->layTheoEmail($gEmail);
+                    (new xuly_email())->guiChaoMung($gEmail, $kh['ho_ten'] ?? '');
+                }
+                if ($kh && (int)$kh['trang_thai'] === 1) {
+                    session_regenerate_id(true);
+                    $kh['hoten'] = $kh['ho_ten'] ?? '';
+                    $_SESSION['user'] = $kh;
+                    $ctrl->redirect('trangchu');
+                    return;
+                }
+            }
+            $ctrl->redirect('dangnhap', ['loi' => 'dangnhap_google_thatbai']);
+            break;
+
         case 'dangxuat':
-            unset($_SESSION['user'], $_SESSION['giohang']);
+            unset($_SESSION['user'], $_SESSION['giohang'], $_SESSION['admin']);
             session_regenerate_id(true);
             $ctrl->redirect('trangchu');
             break;
@@ -118,7 +353,7 @@ try {
                 $giaKm = $kmModel->giaSauKM($sp);
                 $sp['gia_goc'] = $giaKm['gia_goc'];
                 $sp['gia_km'] = $giaKm['gia_km'];
-                $sp['het_hang'] = (int) $sp['so_luong_ton'] <= 0;
+                $spModel->boSungThongTinReal($sp);
             }
             unset($sp);
             $sp_moi = $spModel->layDSMoi();
@@ -128,7 +363,7 @@ try {
                     $giaKm = $kmModel->giaSauKM($sp);
                     $sp['gia_goc'] = $giaKm['gia_goc'];
                     $sp['gia_km'] = $giaKm['gia_km'];
-                    $sp['het_hang'] = (int) $sp['so_luong_ton'] <= 0;
+                    $spModel->boSungThongTinReal($sp);
                 }
                 unset($sp);
             }
@@ -340,7 +575,53 @@ try {
             break;
 
         case 'admin':
-            $ctrl->redirect('sanpham', [], 'admin');
+            if (!empty($_SESSION['admin'])) {
+                $ctrl->redirect('sanpham', [], 'admin');
+            } else {
+                $ctrl->redirect('dangnhap', ['loi_admin' => '1']);
+            }
+            break;
+
+        case 'chatbot':
+            $json = file_get_contents('php://input');
+            $payload = [];
+            if ($json !== false && trim($json) !== '') {
+                $data = json_decode($json, true);
+                if (is_array($data)) {
+                    $payload = $data;
+                }
+            }
+            $message = trim((string) ($payload['message'] ?? $_POST['message'] ?? $_GET['message'] ?? ''));
+            if ($message === '') {
+                $ctrl->json(['ok' => false, 'reply' => 'Bạn chưa nhập câu hỏi cho AI.'], 400);
+                break;
+            }
+
+            $chatbotConfigPath = BASE_PATH . '/support/config/chatbot.local.php';
+            if (!is_file($chatbotConfigPath)) {
+                $chatbotConfigPath = BASE_PATH . '/support/config/chatbot.example.php';
+            }
+
+            $chatbotConfig = is_file($chatbotConfigPath) ? include $chatbotConfigPath : [];
+            $apiKey = getenv('CHATBOT_API_KEY') ?: (string) ($chatbotConfig['api_key'] ?? '');
+            $apiUrl = getenv('CHATBOT_API_URL') ?: (string) ($chatbotConfig['api_url'] ?? '');
+            $model = getenv('CHATBOT_MODEL') ?: (string) ($chatbotConfig['model'] ?? 'gpt-4o-mini');
+            $enabled = filter_var(getenv('CHATBOT_ENABLED') ?: (string) ($chatbotConfig['enabled'] ?? 'false'), FILTER_VALIDATE_BOOLEAN);
+
+            $reply = null;
+            $source = 'local';
+            if ($enabled && $apiKey !== '' && $apiUrl !== '') {
+                $reply = chatbot_call_api($message, $apiKey, $apiUrl, $model);
+                if ($reply !== null && trim($reply) !== '') {
+                    $source = 'api';
+                }
+            }
+
+            if ($reply === null || trim($reply) === '') {
+                $reply = chatbot_build_fallback_reply($message);
+            }
+
+            $ctrl->json(['ok' => true, 'reply' => $reply, 'source' => $source], 200);
             break;
 
         default:
