@@ -5,6 +5,14 @@ if (!defined('BASE_PATH')) {
 }
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
+    ini_set('session.use_strict_mode', '1');
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'secure' => !empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off',
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
     session_start();
 }
 
@@ -23,32 +31,90 @@ $loi = null;
 
 if ($act === 'dangnhap') {
     if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
-        $email = $_POST['email'] ?? $_POST['admin_user'] ?? '';
-        $pass = $_POST['mat_khau'] ?? $_POST['admin_pass'] ?? '';
-        if ($email === 'admin') {
-            $email = 'admin@local.test';
+        if (!$ctrl->verifyCsrfToken($_POST['_csrf'] ?? null)) {
+            http_response_code(403);
+            $loi = 'Phiên biểu mẫu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang và thử lại.';
+        } else {
+            $email = $_POST['email'] ?? $_POST['admin_user'] ?? '';
+            $pass = $_POST['mat_khau'] ?? $_POST['admin_pass'] ?? '';
+            if ($email === 'admin') {
+                $email = 'admin@local.test';
+            }
+            $kq = $admin->dangNhap($email, $pass);
+            if ($kq['ok'] && in_array($kq['nhanvien']['vai_tro'] ?? '', [
+                nhanvien::ROLE_SUPER_ADMIN,
+                nhanvien::ROLE_MANAGER,
+                nhanvien::ROLE_EMPLOYEE,
+                'Admin',
+            ], true)) {
+                session_regenerate_id(true);
+                unset($_SESSION['admin_csrf']);
+                $nv = $kq['nhanvien'];
+                $nv['hoten'] = $nv['ho_ten'] ?? 'Quản Trị Viên';
+                $_SESSION['admin'] = $nv;
+                $ctrl->redirect('sanpham', [], 'admin');
+            }
+            $loi = $kq['ok'] ? 'Tài khoản không có quyền quản trị.' : $kq['loi'];
         }
-        $kq = $admin->dangNhap($email, $pass);
-        if ($kq['ok']) {
-            session_regenerate_id(true);
-            $nv = $kq['nhanvien'];
-            $nv['hoten'] = $nv['ho_ten'] ?? 'Quản Trị Viên';
-            $_SESSION['admin'] = $nv;
-            $ctrl->redirect('sanpham', [], 'admin');
-        }
-        $loi = $kq['loi'];
     }
     $ctrl->render('admin/dangnhap_admin.php', compact('thongBao', 'loi') + ['act' => $act]);
     return;
 }
 
 if ($act === 'dangxuat') {
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+        http_response_code(405);
+        header('Allow: POST');
+        exit('Thao tác đăng xuất phải gửi bằng POST.');
+    }
+    if (!$ctrl->verifyCsrfToken($_POST['_csrf'] ?? null)) {
+        http_response_code(403);
+        exit('Phiên biểu mẫu không hợp lệ hoặc đã hết hạn.');
+    }
     unset($_SESSION['admin']);
+    unset($_SESSION['admin_csrf']);
     $ctrl->redirect('dangnhap', [], 'admin');
 }
 
 if ($ctrl->requireAdmin() === null) {
     $ctrl->redirect('dangnhap', [], 'admin');
+}
+$currentAdmin = $_SESSION['admin'];
+if (!$ctrl->canAccessAdminAction($act, (string) $currentAdmin['vai_tro'])) {
+    http_response_code(403);
+    exit('Tài khoản của bạn không có quyền thực hiện chức năng này.');
+}
+
+$mutationActions = [
+    'themsanpham',
+    'suasanpham',
+    'xoasanpham',
+    'danhmuc',
+    'themdanhmuc',
+    'themnhanvien',
+    'khoanhanvien',
+    'doivaitronhanvien',
+    'khoadanhgia',
+    'khoakhachhang',
+    'guiquatang',
+    'themvoucher',
+    'xoavoucher',
+    'themkhuyenmai',
+    'capnhattrangthai',
+    'doimatkhau',
+];
+$isMutation = in_array($act, $mutationActions, true)
+    || ($act === 'giaodien' && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST');
+if ($isMutation) {
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+        http_response_code(405);
+        header('Allow: POST');
+        exit('Thao tác này phải gửi bằng POST.');
+    }
+    if (!$ctrl->verifyCsrfToken($_POST['_csrf'] ?? null)) {
+        http_response_code(403);
+        exit('Phiên biểu mẫu không hợp lệ hoặc đã hết hạn.');
+    }
 }
 
 switch ($act) {
@@ -106,19 +172,45 @@ switch ($act) {
         break;
 
     case 'themnhanvien':
-        $kq = $admin->themNhanVien($_POST);
+        $kq = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
+            ? $admin->themNhanVien($_POST)
+            : ['ok' => false, 'loi' => 'Thao tác nhân viên phải gửi bằng POST'];
         $loi = $kq['ok'] ? null : $kq['loi'];
-        $thongBao = $kq['ok'] ? 'Da them nhan vien' : null;
+        $thongBao = $kq['ok'] ? 'Đã thêm tài khoản nhân viên' : null;
         $data = $admin->trangNhanVien();
         $ctrl->render('admin/nhanvien.php', $data + compact('thongBao', 'loi') + ['act' => 'nhanvien']);
         break;
 
     case 'khoanhanvien':
-        $id = (int) ($_GET['id'] ?? $_POST['id'] ?? 0);
-        $tt = (int) ($_GET['trang_thai'] ?? $_POST['trang_thai'] ?? 0);
-        $admin->khoaNhanVien($id, $tt);
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            $kq = ['ok' => false, 'loi' => 'Thao tác trạng thái nhân viên phải gửi bằng POST'];
+        } else {
+            $id = filter_var($_POST['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            $tt = filter_var($_POST['trang_thai'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 1]]);
+            $kq = $id === false || $tt === false
+                ? ['ok' => false, 'loi' => 'Mã nhân viên hoặc trạng thái không hợp lệ']
+                : $admin->khoaNhanVien($id, $tt);
+        }
         $data = $admin->trangNhanVien();
-        $ctrl->render('admin/nhanvien.php', $data + ['thongBao' => 'Da cap nhat trang thai nhan vien', 'loi' => null, 'act' => 'nhanvien']);
+        $ctrl->render('admin/nhanvien.php', $data + [
+            'thongBao' => $kq['ok'] ? 'Đã cập nhật trạng thái nhân viên' : null,
+            'loi' => $kq['ok'] ? null : $kq['loi'],
+            'act' => 'nhanvien',
+        ]);
+        break;
+
+    case 'doivaitronhanvien':
+        $id = filter_var($_POST['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $vaiTro = $_POST['vai_tro'] ?? '';
+        $kq = $id === false || !is_string($vaiTro)
+            ? ['ok' => false, 'loi' => 'Mã nhân viên hoặc vai trò không hợp lệ']
+            : (new nhanvien())->doiVaiTro($id, $vaiTro, (int) $currentAdmin['id']);
+        $data = $admin->trangNhanVien();
+        $ctrl->render('admin/nhanvien.php', $data + [
+            'thongBao' => $kq['ok'] ? 'Đã cập nhật vai trò nhân viên' : null,
+            'loi' => $kq['ok'] ? null : $kq['loi'],
+            'act' => 'nhanvien',
+        ]);
         break;
 
     case 'danhgia':
@@ -222,6 +314,75 @@ switch ($act) {
         $ky = $_GET['ky'] ?? 'thang';
         $data = $admin->doanhThu($ky);
         $ctrl->render('admin/doanhthu.php', $data + compact('thongBao', 'loi', 'ky') + ['act' => $act]);
+        break;
+
+    case 'csdl':
+        require_once BASE_PATH . '/model/csdl.php';
+        $tables = [
+            'danhmuc' => 'Danh mục',
+            'sanpham' => 'Sản phẩm',
+            'khachhang' => 'Khách hàng',
+            'nhanvien' => 'Nhân viên',
+            'danhgia' => 'Đánh giá',
+            'voucher' => 'Voucher',
+            'khuyenmai' => 'Khuyến mãi',
+            'donhang' => 'Đơn hàng',
+            'chitietdonhang' => 'Chi tiết đơn hàng',
+            'email' => 'Email',
+        ];
+        $table = $_GET['bang'] ?? 'donhang';
+        if (!is_string($table) || !isset($tables[$table])) {
+            http_response_code(400);
+            $table = 'donhang';
+            $loi = 'Bảng dữ liệu được yêu cầu không hợp lệ.';
+        }
+
+        $pdo = csdl::shared();
+        $tableCounts = [];
+        foreach ($tables as $name => $label) {
+            $tableCounts[$name] = (int) $pdo->query("SELECT COUNT(*) FROM `{$name}`")->fetchColumn();
+        }
+
+        $page = filter_var($_GET['trang'] ?? 1, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($page === false) {
+            http_response_code(400);
+            $page = 1;
+            $loi = 'Số trang không hợp lệ.';
+        }
+        $pageSize = 25;
+        $totalRows = $tableCounts[$table];
+        $totalPages = max(1, (int) ceil($totalRows / $pageSize));
+        $page = min((int) $page, $totalPages);
+
+        $columns = $pdo->query("SHOW COLUMNS FROM `{$table}`")->fetchAll(PDO::FETCH_COLUMN);
+        $visibleColumns = array_values(array_filter(
+            $columns,
+            static fn(string $column): bool => !preg_match('/(?:mat_khau|password|token|secret|otp)/i', $column)
+        ));
+        $offset = ($page - 1) * $pageSize;
+        $statement = $pdo->prepare(
+            'SELECT ' . implode(', ', array_map(static fn(string $column): string => "`{$column}`", $visibleColumns))
+            . " FROM `{$table}` ORDER BY 1 DESC LIMIT :page_size OFFSET :row_offset"
+        );
+        $statement->bindValue(':page_size', $pageSize, PDO::PARAM_INT);
+        $statement->bindValue(':row_offset', $offset, PDO::PARAM_INT);
+        $statement->execute();
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+
+        $ctrl->render('admin/csdl.php', compact(
+            'tables',
+            'tableCounts',
+            'table',
+            'columns',
+            'visibleColumns',
+            'rows',
+            'page',
+            'pageSize',
+            'totalRows',
+            'totalPages',
+            'thongBao',
+            'loi'
+        ) + ['act' => $act]);
         break;
 
     case 'giaodien':

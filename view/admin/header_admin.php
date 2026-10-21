@@ -3,6 +3,16 @@
 $admin_base_url = file_exists('../css/theme.css') ? '../' : (file_exists('view/css/theme.css') ? 'view/' : '../../view/');
 $admin_ctrl_url = 'index.php?khu=admin';
 $user_home_url = 'index.php?act=trangchu';
+$adminRole = (string) ($adminRole ?? ($_SESSION['admin']['vai_tro'] ?? ''));
+$isSuperAdmin = $isSuperAdmin ?? in_array($adminRole, ['Admin', 'SuperAdmin'], true);
+$isManager = $isManager ?? $adminRole === 'QuanLy';
+$isEmployee = $isEmployee ?? $adminRole === 'NhanVien';
+$roleLabel = match ($adminRole) {
+    'Admin', 'SuperAdmin' => 'Super Admin',
+    'QuanLy' => 'Quản lý',
+    'NhanVien' => 'Nhân viên',
+    default => 'Quản trị',
+};
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -47,13 +57,17 @@ $user_home_url = 'index.php?act=trangchu';
         }
         .admin-content {
             flex: 1;
+            min-width: 0;
             background-color: #f8fafc;
             min-height: 100vh;
             overflow-y: auto;
         }
+        .admin-layout {
+            flex-direction: row;
+        }
     </style>
 </head>
-<body class="d-flex">
+<body class="d-flex admin-layout">
     <!-- SIDEBAR QUẢN TRỊ VIÊN -->
     <aside class="admin-sidebar d-flex flex-column flex-shrink-0">
         <!-- Logo Header -->
@@ -77,6 +91,7 @@ $user_home_url = 'index.php?act=trangchu';
                     <i class="fas fa-boxes"></i> [A1] Quản lý Sản phẩm
                 </a>
             </li>
+            <?php if ($isSuperAdmin): ?>
             <!-- [A6] Khuyến mãi & Hàng ế -->
             <li class="nav-item">
                 <a href="<?=$admin_ctrl_url?>&act=khuyenmai" class="nav-link <?=($_GET['act'] ?? '') == 'khuyenmai' ? 'active' : ''?>">
@@ -89,7 +104,9 @@ $user_home_url = 'index.php?act=trangchu';
                     <i class="fas fa-ticket-alt"></i> [A5] Quản lý Voucher
                 </a>
             </li>
+            <?php endif; ?>
 
+            <?php if ($isSuperAdmin || $isManager): ?>
             <li class="nav-header">Khách hàng & Đơn hàng</li>
             <!-- [A7] Quản lý đơn hàng -->
             <li class="nav-item">
@@ -103,6 +120,8 @@ $user_home_url = 'index.php?act=trangchu';
                     <i class="fas fa-users"></i> [A4] Quản lý Khách hàng
                 </a>
             </li>
+            <?php endif; ?>
+            <?php if ($isSuperAdmin): ?>
             <!-- [A3] Đánh giá & Khóa bình luận xấu -->
             <li class="nav-item">
                 <a href="<?=$admin_ctrl_url?>&act=danhgia" class="nav-link <?=($_GET['act'] ?? '') == 'danhgia' ? 'active' : ''?>">
@@ -117,24 +136,36 @@ $user_home_url = 'index.php?act=trangchu';
                     <i class="fas fa-user-tie"></i> [A2] Quản lý Nhân viên
                 </a>
             </li>
+            <?php endif; ?>
             <!-- [A8] Thống kê doanh thu -->
+            <?php if ($isSuperAdmin): ?>
             <li class="nav-item">
                 <a href="<?=$admin_ctrl_url?>&act=doanhthu" class="nav-link <?=($_GET['act'] ?? '') == 'doanhthu' ? 'active' : ''?>">
                     <i class="fas fa-chart-line"></i> [A8] Thống kê Doanh thu
                 </a>
             </li>
+            <?php endif; ?>
             <!-- [A9] Cấu hình Giao diện: Mùa, Font, Nền -->
+            <?php if ($isSuperAdmin || $isManager): ?>
             <li class="nav-item">
                 <a href="<?=$admin_ctrl_url?>&act=giaodien" class="nav-link <?=($_GET['act'] ?? '') == 'giaodien' ? 'active' : ''?>">
                     <i class="fas fa-palette text-warning"></i> [A9] Giao diện (Mùa, Font, Nền)
                 </a>
             </li>
+            <?php endif; ?>
             <!-- [A10] Đổi mật khẩu Quản trị -->
             <li class="nav-item">
                 <a href="<?=$admin_ctrl_url?>&act=doimatkhau" class="nav-link <?=($_GET['act'] ?? '') == 'doimatkhau' ? 'active' : ''?>">
                     <i class="fas fa-key text-info"></i> [A10] Đổi Mật Khẩu Admin
                 </a>
             </li>
+            <?php if ($isSuperAdmin): ?>
+            <li class="nav-item">
+                <a href="<?=$admin_ctrl_url?>&act=csdl" class="nav-link <?=($_GET['act'] ?? '') == 'csdl' ? 'active' : ''?>">
+                    <i class="fas fa-database text-success"></i> Dữ liệu CSDL
+                </a>
+            </li>
+            <?php endif; ?>
         </ul>
 
         <!-- Bottom User Info & Logout -->
@@ -145,8 +176,8 @@ $user_home_url = 'index.php?act=trangchu';
                         <i class="fas fa-user-check"></i>
                     </div>
                     <div>
-                        <div class="text-white small fw-bold"><?=$_SESSION['admin']['hoten'] ?? 'Quản Trị Viên'?></div>
-                        <div class="text-success" style="font-size: 0.72rem;">● Đang online</div>
+                        <div class="text-white small fw-bold"><?=htmlspecialchars((string) ($_SESSION['admin']['hoten'] ?? 'Quản Trị Viên'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')?></div>
+                        <div class="text-success" style="font-size: 0.72rem;"><?=$roleLabel?></div>
                     </div>
                 </div>
             </div>
@@ -154,9 +185,12 @@ $user_home_url = 'index.php?act=trangchu';
                 <a href="<?=$user_home_url?>" class="btn btn-outline-light btn-sm flex-fill" style="font-size: 0.75rem;" title="Xem trang chủ bán hàng">
                     <i class="fas fa-store me-1"></i> Xem Shop
                 </a>
-                <a href="<?=$admin_ctrl_url?>&act=dangxuat" class="btn btn-danger btn-sm" style="font-size: 0.75rem;" title="Đăng xuất quản trị">
-                    <i class="fas fa-sign-out-alt"></i>
-                </a>
+                <form action="<?=$admin_ctrl_url?>&amp;act=dangxuat" method="post">
+                    <input type="hidden" name="_csrf" value="<?=htmlspecialchars($csrfToken, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')?>">
+                    <button type="submit" class="btn btn-danger btn-sm" style="font-size: 0.75rem;" title="Đăng xuất quản trị">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </form>
             </div>
         </div>
     </aside>
@@ -170,9 +204,9 @@ $user_home_url = 'index.php?act=trangchu';
                     <i class="fas fa-desktop text-primary me-2"></i> Bảng Điều Khiển Hệ Thống Bán Điện Thoại MVC
                 </span>
                 <div class="d-flex align-items-center gap-2">
-                    <a href="<?=$admin_ctrl_url?>&act=giaodien" class="btn btn-warning btn-sm rounded-pill px-3 fw-bold text-dark shadow-sm">
+                    <?php if ($isSuperAdmin || $isManager): ?><a href="<?=$admin_ctrl_url?>&act=giaodien" class="btn btn-warning btn-sm rounded-pill px-3 fw-bold text-dark shadow-sm">
                         <i class="fas fa-palette me-1 text-danger"></i> Đổi Giao Diện (Mùa/Font/Nền)
-                    </a>
+                    </a><?php endif; ?>
                     <span class="badge bg-primary rounded-pill px-3 py-2">
                         <i class="fas fa-calendar-alt me-1"></i> <?=date('d/m/Y')?>
                     </span>
@@ -183,4 +217,3 @@ $user_home_url = 'index.php?act=trangchu';
             </div>
         </nav>
         <div class="p-4">
-

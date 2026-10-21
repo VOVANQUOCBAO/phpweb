@@ -1,4 +1,5 @@
 /support/config/database.local.php
+/support/config/google.local.php
 /support/vendor/
 /support/tests/ketqua_*.json
 /config/database.local.php

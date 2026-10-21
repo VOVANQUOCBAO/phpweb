@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS khachhang (
   ho_ten VARCHAR(150) NOT NULL,
   ten_dang_nhap VARCHAR(100) NULL,
   email VARCHAR(150) NOT NULL UNIQUE,
+  google_sub VARCHAR(255) NULL UNIQUE,
   sdt VARCHAR(20) NULL,
   mat_khau VARCHAR(255) NOT NULL,
   ngay_sinh DATE NULL,

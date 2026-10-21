@@ -1,160 +1,55 @@
 <?php
-$order_id = $_GET['id'] ?? 'DH-20261018';
+$e = static fn(mixed $value): string => htmlspecialchars((string) ($value ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+$order = is_array($donhang ?? null) ? $donhang : null;
+$timeline = $order['timeline'] ?? [];
+$currentIndex = array_search($order['trang_thai'] ?? '', $timeline, true);
 ?>
-
-<div class="container my-5">
-    <div class="row justify-content-center">
-        <div class="col-12 col-lg-10">
-            
-            <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 pb-2 border-bottom gap-3">
-                <div>
-                    <h2 class="fw-bold text-primary mb-1">
-                        <i class="fas fa-route me-2"></i> Theo Dõi Quá Trình Giao Hàng [U8]
-                    </h2>
-                    <p class="text-muted small mb-0">Theo dõi tiến trình trực quan thời gian thực (Order Tracking) [12/5]</p>
-                </div>
-                <a href="index.php?act=lichsumuahang" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
-                    <i class="fas fa-arrow-left me-1"></i> Quay lại lịch sử đơn
-                </a>
-            </div>
-
-            <!-- Ô tìm kiếm mã đơn nhanh -->
-            <div class="card border-0 shadow-sm rounded-4 p-4 bg-white mb-4">
-                <form action="index.php" method="GET" class="row g-3 align-items-center">
-                    <input type="hidden" name="act" value="theodoidonhang">
-                    <div class="col-12 col-md-8">
-                        <label class="form-label small fw-semibold text-muted">Tra cứu theo Mã đơn hàng hoặc Số điện thoại:</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light border-end-0"><i class="fas fa-barcode text-primary"></i></span>
-                            <input type="text" name="id" class="form-control border-start-0" placeholder="Ví dụ: DH-20261018 hoặc 0901234567" value="<?=htmlspecialchars($order_id)?>" required>
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-4 d-flex align-items-end">
-                        <button type="submit" class="btn btn-primary w-100 rounded-pill py-2 fw-bold shadow">
-                            <i class="fas fa-search me-1"></i> Tra Cứu Đơn
-                        </button>
-                    </div>
-                </form>
-            </div>
-
-            <!-- Khung Hiển Thị Tiến Trình Đơn Hàng -->
-            <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white border-blue mb-4">
-                <div class="card-header bg-primary text-white py-3 px-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
-                    <div>
-                        <span class="small opacity-75">Mã đơn hàng:</span>
-                        <h5 class="mb-0 fw-bold"><?=htmlspecialchars($order_id)?></h5>
-                    </div>
-                    <div>
-                        <span class="badge bg-warning text-dark px-3 py-2 fw-bold fs-6">
-                            <i class="fas fa-truck-moving me-1"></i> Đang Giao Hàng (Bước 3/5)
-                        </span>
-                    </div>
-                </div>
-
-                <div class="card-body p-4 p-md-5">
-                    
-                    <!-- THANH TIẾN TRÌNH TRỰC QUAN 5 BƯỚC THEO ĐÚNG LAB [W] [12/5] -->
-                    <!-- Chờ xác nhận → Xác nhận đơn hàng → Đang giao → Đã giao → Thành công -->
-                    <div class="tracking-timeline mb-5">
-                        
-                        <!-- Bước 1: Chờ xác nhận -->
-                        <div class="timeline-step completed">
-                            <div class="timeline-icon">
-                                <i class="fas fa-file-invoice"></i>
-                            </div>
-                            <h6 class="timeline-title small mb-1">Chờ xác nhận</h6>
-                            <span class="small text-muted d-block" style="font-size: 0.72rem;">08:30 18/10</span>
-                        </div>
-
-                        <!-- Bước 2: Xác nhận đơn hàng -->
-                        <div class="timeline-step completed">
-                            <div class="timeline-icon">
-                                <i class="fas fa-box-check"></i>
-                            </div>
-                            <h6 class="timeline-title small mb-1">Xác nhận đơn</h6>
-                            <span class="small text-muted d-block" style="font-size: 0.72rem;">09:15 18/10</span>
-                        </div>
-
-                        <!-- Bước 3: Đang giao hàng (Active) -->
-                        <div class="timeline-step active">
-                            <div class="timeline-icon">
-                                <i class="fas fa-truck-fast"></i>
-                            </div>
-                            <h6 class="timeline-title small mb-1">Đang giao</h6>
-                            <span class="small text-primary fw-bold d-block" style="font-size: 0.72rem;">Đang trên đường</span>
-                        </div>
-
-                        <!-- Bước 4: Đã giao -->
-                        <div class="timeline-step">
-                            <div class="timeline-icon">
-                                <i class="fas fa-hand-holding-box"></i>
-                            </div>
-                            <h6 class="timeline-title small mb-1">Đã giao</h6>
-                            <span class="small text-muted d-block" style="font-size: 0.72rem;">Dự kiến 11:30</span>
-                        </div>
-
-                        <!-- Bước 5: Thành công -->
-                        <div class="timeline-step">
-                            <div class="timeline-icon">
-                                <i class="fas fa-star"></i>
-                            </div>
-                            <h6 class="timeline-title small mb-1">Thành công</h6>
-                            <span class="small text-muted d-block" style="font-size: 0.72rem;">+Điểm tích lũy</span>
-                        </div>
-
-                    </div>
-
-                    <!-- Thông tin Shipper và Lộ trình chi tiết -->
-                    <div class="row g-4 mt-2">
-                        <div class="col-12 col-md-6">
-                            <div class="p-3 bg-light rounded-4 h-100">
-                                <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
-                                    <i class="fas fa-user-astronaut text-primary me-2"></i> Thông Tin Nhân Viên Giao Hàng
-                                </h6>
-                                <div class="d-flex align-items-center gap-3 mb-3">
-                                    <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
-                                        <i class="fas fa-motorcycle fs-5"></i>
-                                    </div>
-                                    <div>
-                                        <div class="fw-bold">Nguyễn Văn Bình (Shipper Siêu Tốc)</div>
-                                        <div class="small text-muted">SĐT: <strong class="text-primary">0988.123.456</strong></div>
-                                        <div class="small text-warning">⭐⭐⭐⭐⭐ (4.9/5)</div>
-                                    </div>
-                                </div>
-                                <div class="small text-secondary">
-                                    <p class="mb-1"><i class="fas fa-map-pin text-danger me-2"></i> <strong>Địa chỉ giao:</strong> 624 Âu Cơ, P.10, Q. Tân Bình, TP. HCM</p>
-                                    <p class="mb-0"><i class="fas fa-comment-dots text-info me-2"></i> <strong>Ghi chú:</strong> Gọi trước 15 phút khi đến nơi.</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-12 col-md-6">
-                            <div class="p-3 bg-light rounded-4 h-100">
-                                <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
-                                    <i class="fas fa-history text-primary me-2"></i> Chi Tiết Nhật Ký Vận Chuyển
-                                </h6>
-                                <ul class="list-unstyled small mb-0 lh-lg">
-                                    <li class="d-flex gap-2">
-                                        <span class="text-primary fw-bold">10:05</span>
-                                        <span>Shipper đã nhận hàng từ kho tổng và đang di chuyển tới địa chỉ nhận.</span>
-                                    </li>
-                                    <li class="d-flex gap-2 text-muted">
-                                        <span class="fw-bold">09:15</span>
-                                        <span>Đơn hàng đã được đóng gói niêm phong, kiểm tra chất lượng.</span>
-                                    </li>
-                                    <li class="d-flex gap-2 text-muted">
-                                        <span class="fw-bold">08:30</span>
-                                        <span>Khách hàng đặt hàng thành công trên website.</span>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-
-        </div>
+<main class="container my-5">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div><h1 class="h2 fw-bold text-primary mb-1">Theo dõi đơn hàng</h1><p class="text-muted mb-0">Tra cứu đơn hàng trong tài khoản đang đăng nhập.</p></div>
+        <a class="btn btn-outline-secondary" href="index.php?act=lichsumuahang">Quay lại lịch sử đơn</a>
     </div>
-</div>
+    <?php if (!empty($loi)): ?><div class="alert alert-danger"><?=$e($loi)?></div><?php endif; ?>
+    <section class="card border-0 shadow-sm mb-4"><div class="card-body">
+        <form action="index.php" method="get" class="row g-3 align-items-end">
+            <input type="hidden" name="act" value="theodoidonhang">
+            <div class="col-sm-8"><label class="form-label" for="orderId">Mã đơn hàng (ID)</label><input class="form-control" id="orderId" type="number" name="id" min="1" value="<?=$order ? (int) $order['id'] : $e($_GET['id'] ?? '')?>" required></div>
+            <div class="col-sm-4"><button class="btn btn-primary w-100" type="submit">Tra cứu đơn</button></div>
+        </form>
+    </div></section>
 
+    <?php if ($order): ?>
+        <article class="card border-0 shadow-sm rounded-4 overflow-hidden">
+            <div class="card-header bg-primary text-white d-flex flex-wrap justify-content-between gap-2">
+                <strong>Đơn hàng #<?=(int) $order['id']?></strong>
+                <span><?= $e($order['trang_thai']) ?></span>
+            </div>
+            <div class="card-body p-4">
+                <?php if ($currentIndex !== false): ?>
+                    <ol class="list-group list-group-numbered mb-4">
+                        <?php foreach ($timeline as $index => $step): ?>
+                            <li class="list-group-item <?=$index < $currentIndex ? 'list-group-item-success' : ($index === $currentIndex ? 'list-group-item-primary fw-bold' : '')?>">
+                                <?=$e($step)?><?=$index === $currentIndex ? ' — trạng thái hiện tại' : ''?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ol>
+                <?php else: ?>
+                    <div class="alert alert-warning">Đơn hàng đã kết thúc với trạng thái: <?=$e($order['trang_thai'])?>.</div>
+                <?php endif; ?>
+                <?php if (!empty($order['ly_do_huy'])): ?><p><strong>Ghi chú trạng thái:</strong> <?=$e($order['ly_do_huy'])?></p><?php endif; ?>
+                <p><strong>Ngày đặt:</strong> <?=$e($order['ngay_dat'])?> · <strong>Cập nhật:</strong> <?=$e($order['ngay_cap_nhat'])?></p>
+                <p><strong>Địa chỉ giao hàng:</strong> <?=$e($order['dia_chi'])?> · <strong>Điện thoại:</strong> <?=$e($order['sdt'])?></p>
+                <h2 class="h5 mt-4">Sản phẩm</h2>
+                <ul class="list-group mb-3">
+                    <?php foreach ($order['chitiet'] as $item): ?>
+                        <li class="list-group-item d-flex justify-content-between gap-3">
+                            <span><?=$e($item['ten_sp'])?> × <?=$e($item['so_luong'])?></span>
+                            <strong><?=number_format((float) $item['don_gia'] * (int) $item['so_luong'], 0, ',', '.')?>đ</strong>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+                <div class="text-end"><div>Phí giao hàng: <?=number_format((float) $order['phi_ship'], 0, ',', '.')?>đ</div><strong class="text-danger fs-5">Tổng: <?=number_format((float) $order['tong_tien'], 0, ',', '.')?>đ</strong></div>
+            </div>
+        </article>
+    <?php endif; ?>
+</main>

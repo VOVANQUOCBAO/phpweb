@@ -41,6 +41,7 @@ $currBg = $currTheme['bg'] ?? 'bg-light-gray';
     <?php endif; ?>
 
     <form action="<?=$admin_ctrl_url?>&act=giaodien" method="POST" id="themeAdminForm">
+        <input type="hidden" name="_csrf" value="<?=$e($csrfToken)?>">
         <div class="row g-4">
             
             <!-- CỘT TRÁI: CÁC TÙY CHỌN CHỦ ĐỀ, FONT VÀ NỀN -->
@@ -346,5 +347,3 @@ document.addEventListener("DOMContentLoaded", function() {
     updateLivePreview();
 });
 </script>
-
-

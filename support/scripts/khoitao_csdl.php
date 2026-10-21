@@ -13,6 +13,16 @@ try {
     $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$cfg['dbname']}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     $pdo->exec("USE `{$cfg['dbname']}`");
     $pdo->exec(file_get_contents(dirname(__DIR__, 2) . '/database/schema.sql'));
+    $customerColumns = $pdo->query('SHOW COLUMNS FROM khachhang')->fetchAll(PDO::FETCH_COLUMN);
+    if (!in_array('ten_dang_nhap', $customerColumns, true)) {
+        $pdo->exec('ALTER TABLE khachhang ADD COLUMN ten_dang_nhap VARCHAR(100) NULL AFTER ho_ten');
+    }
+    if (!in_array('sdt', $customerColumns, true)) {
+        $pdo->exec('ALTER TABLE khachhang ADD COLUMN sdt VARCHAR(20) NULL AFTER email');
+    }
+    if (!in_array('google_sub', $customerColumns, true)) {
+        $pdo->exec('ALTER TABLE khachhang ADD COLUMN google_sub VARCHAR(255) NULL UNIQUE AFTER email');
+    }
     $admin = $pdo->query("SELECT id, mat_khau FROM nhanvien WHERE email = 'admin@local.test' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
     $initialPassword = getenv('ADMIN_INITIAL_PASSWORD');
     $hasConfiguredPassword = $initialPassword !== false && $initialPassword !== '';
@@ -30,10 +40,10 @@ try {
                 'INSERT INTO nhanvien (ho_ten, email, mat_khau, vai_tro, trang_thai)
                  VALUES (?, ?, ?, ?, 1)'
             );
-            $stmt->execute(['Quản trị viên', 'admin@local.test', $hash, 'Admin']);
+            $stmt->execute(['Quản trị viên', 'admin@local.test', $hash, 'SuperAdmin']);
         } else {
             $stmt = $pdo->prepare('UPDATE nhanvien SET mat_khau = ?, vai_tro = ?, trang_thai = 1 WHERE id = ?');
-            $stmt->execute([$hash, 'Admin', $admin['id']]);
+            $stmt->execute([$hash, 'SuperAdmin', $admin['id']]);
         }
         echo "Da tao/cap nhat tai khoan quan tri admin@local.test.\n";
         if ($generatedPassword) {

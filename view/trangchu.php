@@ -1,9 +1,9 @@
 <?php
 // Xác định đường dẫn tương đối tới ảnh tùy theo ngữ cảnh gọi view
 if (!isset($img_path)) {
-    if (file_exists('view/image/iphone 15 pro max.jpeg')) {
+    if (file_exists('view/image/ai-phone-elegance.svg')) {
         $img_path = 'view/image/';
-    } elseif (file_exists('../view/image/iphone 15 pro max.jpeg')) {
+    } elseif (file_exists('../view/image/ai-phone-elegance.svg')) {
         $img_path = '../view/image/';
     } else {
         $img_path = 'view/image/';
@@ -15,7 +15,7 @@ if (!function_exists('renderCardTrangChu')) {
     function renderCardTrangChu(array $sp, string $img_path, string $badgeType = ''): void {
         $id = (int)$sp['id'];
         $ten = htmlspecialchars($sp['ten_sp']);
-        $hinh = !empty($sp['hinh']) ? $img_path . $sp['hinh'] : $img_path . 'iphone 15 pro max.jpeg';
+        $hinh = !empty($sp['hinh']) ? $img_path . $sp['hinh'] : $img_path . 'ai-phone-elegance.svg';
         $giaGoc = (float)($sp['gia_goc'] ?? $sp['gia']);
         $giaKm = (float)($sp['gia_km'] ?? $sp['gia']);
         $tonKho = (int)($sp['so_luong_ton'] ?? 0);

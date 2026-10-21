@@ -1,9 +1,9 @@
 <?php
 // Kiểm tra đường dẫn hình ảnh
 if (!isset($img_path)) {
-    if (file_exists('view/image/iphone 15 pro max.jpeg')) {
+    if (file_exists('view/image/ai-phone-elegance.svg')) {
         $img_path = 'view/image/';
-    } elseif (file_exists('../view/image/iphone 15 pro max.jpeg')) {
+    } elseif (file_exists('../view/image/ai-phone-elegance.svg')) {
         $img_path = '../view/image/';
     } else {
         $img_path = 'view/image/';
@@ -23,7 +23,7 @@ if (isset($giohang['items']) && is_array($giohang['items'])) {
             $it['ten_sp'],
             $it['gia'],
             $it['so_luong'],
-            $it['hinh'] ?: 'iphone 15 pro max.jpeg',
+            $it['hinh'] ?: 'ai-phone-elegance.svg',
             $it['thanh_tien'] ?? ($it['gia'] * $it['so_luong'])
         ];
     }
@@ -34,7 +34,7 @@ if (isset($giohang['items']) && is_array($giohang['items'])) {
         } elseif (is_numeric($it) && class_exists('sanpham')) {
             $spInfo = (new sanpham())->layChiTiet((int)$k);
             if ($spInfo) {
-                $cart_items[] = [$spInfo['id'], $spInfo['ten_sp'], (float)$spInfo['gia'], (int)$it, $spInfo['hinh'] ?: 'iphone 15 pro max.jpeg', (float)$spInfo['gia'] * (int)$it];
+                $cart_items[] = [$spInfo['id'], $spInfo['ten_sp'], (float)$spInfo['gia'], (int)$it, $spInfo['hinh'] ?: 'ai-phone-elegance.svg', (float)$spInfo['gia'] * (int)$it];
             }
         }
     }
@@ -88,7 +88,7 @@ $tong_tien = 0;
                             $ten = $item[1];
                             $gia = (float)$item[2];
                             $sl = (int)$item[3];
-                            $hinh = $item[4] ?? 'iphone 15 pro max.jpeg';
+                            $hinh = $item[4] ?? 'ai-phone-elegance.svg';
                             $thanh_tien = isset($item[5]) ? (float)$item[5] : ($gia * $sl);
                             $tong_tien += $thanh_tien;
                         ?>
@@ -170,4 +170,3 @@ $tong_tien = 0;
         </div>
     <?php endif; ?>
 </div>
-

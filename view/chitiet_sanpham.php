@@ -1,9 +1,9 @@
 <?php
 // Tự động nhận diện đường dẫn ảnh
 if (!isset($img_path)) {
-    if (file_exists('view/image/iphone 15 pro max.jpeg')) {
+    if (file_exists('view/image/ai-phone-elegance.svg')) {
         $img_path = 'view/image/';
-    } elseif (file_exists('../view/image/iphone 15 pro max.jpeg')) {
+    } elseif (file_exists('../view/image/ai-phone-elegance.svg')) {
         $img_path = '../view/image/';
     } else {
         $img_path = 'view/image/';
@@ -25,7 +25,7 @@ $products_mock = [
         'stock' => 15,
         'sold' => 215,
         'rating' => 5,
-        'image' => 'iphone 15 pro max.jpeg',
+        'image' => 'ai-phone-elegance.svg',
         'brand' => 'Apple',
         'desc' => 'iPhone 15 Pro Max là chiếc điện thoại đỉnh cao với thiết kế khung viền Titanium chuẩn hàng không vũ trụ, cực nhẹ và bền bỉ. Trang bị chip Apple A17 Pro tiến trình 3nm mang lại hiệu năng gaming cấp độ console. Camera tiềm vọng zoom quang học 5x sắc nét cùng cổng sạc USB-C tốc độ cao 10Gbps.',
         'specs' => [
@@ -48,7 +48,7 @@ $products_mock = [
         'stock' => 8,
         'sold' => 148,
         'rating' => 5,
-        'image' => 'Samsung Galaxy S24 Ultra 5G.jpg',
+        'image' => 'ai-phone-innovation.svg',
         'brand' => 'Samsung',
         'desc' => 'Samsung Galaxy S24 Ultra mang đến trải nghiệm AI toàn diện. Thiết kế viền Titanium đẳng cấp, màn hình phẳng hoàn toàn với kính cường lực Corning Gorilla Armor chống chói đỉnh cao. Camera mắt thần bóng đêm 200MP tích hợp công cụ chỉnh ảnh AI thông minh và bút S-Pen quyền năng.',
         'specs' => [
@@ -71,7 +71,7 @@ $products_mock = [
         'stock' => 20,
         'sold' => 68,
         'rating' => 4,
-        'image' => 'Xiaomi 14 5G 256GB.jpg',
+        'image' => 'ai-phone-portrait.svg',
         'brand' => 'Xiaomi',
         'desc' => 'Xiaomi 14 mở ra kỷ nguyên mới với cụm 3 camera đồng chế tác cùng Leica thế hệ mới. Khung viền vát phẳng siêu gọn gàng trong lòng bàn tay. Vi xử lý Snapdragon 8 Gen 3 cực đỉnh, màn hình CrystalRes 1.5K siêu sáng 3000 nits và sạc siêu tốc HyperCharge 90W.',
         'specs' => [
@@ -94,7 +94,7 @@ $products_mock = [
         'stock' => 50,
         'sold' => 92,
         'rating' => 5,
-        'image' => 'OPPO Reno11 F 5G.png',
+        'image' => 'ai-phone-portrait.svg',
         'brand' => 'OPPO',
         'desc' => 'OPPO Reno11 F 5G nổi bật với mặt lưng thiết kế vân đá kim sa lấp lánh, kháng nước bụi IP65 bền bỉ. Camera siêu nét 64MP ghi lại chân dung rực rỡ, pin trâu 5000 mAh cùng sạc nhanh siêu tốc SuperVOOC 67W.',
         'specs' => [
@@ -117,7 +117,7 @@ $products_mock = [
         'stock' => 30,
         'sold' => 55,
         'rating' => 5,
-        'image' => 'iPhone 16 256GB.png',
+        'image' => 'ai-phone-elegance.svg',
         'brand' => 'Apple',
         'desc' => 'iPhone 16 mang đến cuộc cách mạng với Apple Intelligence và Nút Điều Khiển Camera (Camera Control). Hệ thống camera kép 48MP Fusion chụp ảnh độ phân giải siêu cao và quay video không gian Spatial Video cho kính Apple Vision Pro.',
         'specs' => [
