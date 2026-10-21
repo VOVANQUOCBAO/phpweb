@@ -138,9 +138,14 @@
 </div>
 
 <!-- ========================================================
-     NHÚNG BOOTSTRAP 5 JS & SCRIPT XỬ LÝ TOAST, THEME, CHAT AI
+     NHÚNG BOOTSTRAP 5 JS & SCRIPT XỬ LÝ TOAST, THEME, CHAT AI, HIỆU ỨNG MÙA
      ======================================================== -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<?php
+$footer_base_url = !empty($base_url) ? $base_url : (file_exists('view/css/theme.css') ? 'view' : (file_exists('../view/css/theme.css') ? '../view' : '../../view'));
+?>
+<!-- Script hiệu ứng 4 mùa (Hoa đào, Bãi biển cây dừa, Lá phong, Tuyết & Ông già Noel) -->
+<script src="<?=$footer_base_url?>/js/season_effects.js"></script>
 
 <script>
 // Quản lý Toast giỏ hàng và sự kiện Mua hàng
@@ -197,6 +202,9 @@ function changeThemeSeason(season) {
         document.body.classList.add(season);
     }
     localStorage.setItem('selected_season', season);
+    if (typeof SeasonEffects !== 'undefined') {
+        SeasonEffects.changeSeason(season);
+    }
 }
 
 // Hàm đổi Font chữ
@@ -217,15 +225,8 @@ function changeBackgroundMode(bg) {
     localStorage.setItem('selected_bg', bg);
 }
 
-// Khôi phục cài đặt lưu trữ
+// Khôi phục cài đặt lưu trữ cá nhân (Font & Nền)
 function restoreUserPreferences() {
-    const savedSeason = localStorage.getItem('selected_season');
-    if (savedSeason) {
-        changeThemeSeason(savedSeason);
-        const sel = document.getElementById('seasonSelect');
-        if (sel) sel.value = savedSeason;
-    }
-
     const savedFont = localStorage.getItem('selected_font');
     if (savedFont) {
         changeFontFamily(savedFont);

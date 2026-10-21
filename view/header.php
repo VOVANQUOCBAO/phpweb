@@ -20,6 +20,17 @@ if (is_file($theme_file)) {
     }
 }
 
+// Chỉ Quản trị viên (Admin) mới có quyền xem thử mùa qua tham số GET (?season=theme-spring, summer, autumn, winter)
+if (!empty($_GET['season']) && isset($_SESSION['admin'])) {
+    $s = trim($_GET['season']);
+    if (!str_starts_with($s, 'theme-') && $s !== 'default') {
+        $s = 'theme-' . $s;
+    }
+    if (in_array($s, ['default', 'theme-spring', 'theme-summer', 'theme-autumn', 'theme-winter'], true)) {
+        $theme_cfg['season'] = $s;
+    }
+}
+
 $body_classes = [];
 if (!empty($theme_cfg['season']) && $theme_cfg['season'] !== 'default') {
     $body_classes[] = htmlspecialchars($theme_cfg['season']);
@@ -31,6 +42,15 @@ if (!empty($theme_cfg['bg'])) {
     $body_classes[] = htmlspecialchars($theme_cfg['bg']);
 }
 $body_class_attr = !empty($body_classes) ? ' class="' . implode(' ', $body_classes) . '"' : '';
+
+// Huy hiệu trực quan theo mùa
+$seasonBadges = [
+    'theme-spring' => '<span class="badge bg-danger text-white rounded-pill px-2 py-1 shadow-sm"><i class="fas fa-spa me-1"></i> 🌸 Xuân Hoa Mai Vàng (Đỏ Tết)</span>',
+    'theme-summer' => '<span class="badge bg-info text-white rounded-pill px-2 py-1 shadow-sm"><i class="fas fa-umbrella-beach me-1"></i> ☀️ Hạ Sôi Động & Cây Dừa</span>',
+    'theme-autumn' => '<span class="badge bg-warning text-dark rounded-pill px-2 py-1 shadow-sm"><i class="fas fa-leaf me-1"></i> 🍂 Thu Lá Phong Rơi</span>',
+    'theme-winter' => '<span class="badge bg-primary text-white rounded-pill px-2 py-1 shadow-sm"><i class="fas fa-snowflake me-1"></i> ❄️ Đông Tuyết & Tuần Lộc Noel</span>',
+];
+$activeSeasonBadge = $seasonBadges[$theme_cfg['season'] ?? ''] ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -46,6 +66,8 @@ $body_class_attr = !empty($body_classes) ? ' class="' . implode(' ', $body_class
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Nhúng CSS tùy chỉnh (theme.css) -->
     <link rel="stylesheet" href="<?=$base_url?>/css/theme.css">
+    <!-- Nhúng CSS Hiệu Ứng 4 Mùa Đẹp Mắt (Hoa Đào, Bãi Biển Cây Dừa, Lá Phong, Tuyết & Ông Già Noel) -->
+    <link rel="stylesheet" href="<?=$base_url?>/css/season_effects.css">
 </head>
 <body<?=$body_class_attr?>>
     <!-- THANH TIỆN ÍCH TRÊN CÙNG (DÀNH CHO KHÁCH HÀNG & PHÍM TẮT QUẢN TRỊ ADMIN) -->
@@ -55,6 +77,9 @@ $body_class_attr = !empty($body_classes) ? ' class="' . implode(' ', $body_class
                 <span class="small"><i class="fas fa-headset me-1 text-warning"></i> Hotline: <strong class="text-white">1800.6868</strong> (Miễn phí)</span>
                 <span class="small d-none d-md-inline"><i class="fas fa-truck-fast me-1 text-info"></i> Giao siêu tốc 1h</span>
                 <span class="small d-none d-lg-inline"><i class="fas fa-shield-alt me-1 text-success"></i> 100% Chính hãng VN/A</span>
+                <?php if (!empty($activeSeasonBadge)): ?>
+                    <span class="d-none d-sm-inline ms-1"><?=$activeSeasonBadge?></span>
+                <?php endif; ?>
             </div>
             <div class="d-flex align-items-center gap-2 small">
                 <?php if (isset($_SESSION['admin'])): ?>
